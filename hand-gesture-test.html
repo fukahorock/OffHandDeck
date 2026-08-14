@@ -293,7 +293,15 @@
     font-size: 13px;
   }
   .calib-direction-row .dir-label {
-    width: 90px;
+    width: 60px;
+  }
+  .calib-direction-row .dir-target {
+    width: 140px;
+    color: #999;
+  }
+  .calib-direction-row.in-range .dir-target {
+    color: #7fd18a;
+    font-weight: bold;
   }
   .calib-direction-row .dir-check {
     color: #7fd18a;
@@ -307,6 +315,11 @@
     background: #3a6ea5;
     color: #fff;
     cursor: pointer;
+  }
+  #calibCurrentAngle {
+    font-size: 13px;
+    color: #ccc;
+    margin: 8px 0;
   }
   #calibCaptureStatus {
     font-size: 13px;
@@ -416,7 +429,8 @@
         </div>
 
         <div id="calibCaptureArea">
-          <p class="calib-hint">対象ポーズの指の形を作ってから撮影してください（各方向で少し角度を変えて撮影すると精度が上がります）。</p>
+          <p class="calib-hint">対象ポーズの指の形を作り、各行の目安の角度に近づけてから撮影してください。無理に横を向く必要はなく、自然に構えたままで大丈夫です。</p>
+          <p id="calibCurrentAngle">現在の角度: -</p>
           <div id="calibDirectionList"></div>
           <button id="calibExtendBtn">向きを追加（拡張モード）</button>
           <p id="calibCaptureStatus"></p>
@@ -485,6 +499,7 @@ const calibReuseUseBtn = document.getElementById('calibReuseUseBtn');
 const calibReuseRedoBtn = document.getElementById('calibReuseRedoBtn');
 const calibCaptureArea = document.getElementById('calibCaptureArea');
 const calibDirectionList = document.getElementById('calibDirectionList');
+const calibCurrentAngle = document.getElementById('calibCurrentAngle');
 const calibExtendBtn = document.getElementById('calibExtendBtn');
 const calibCaptureStatus = document.getElementById('calibCaptureStatus');
 const calibAdjustSlider = document.getElementById('calibAdjustSlider');
@@ -667,15 +682,29 @@ let calibDirections = [];
 let calibCaptures = [];
 let calibCurrentAdjustment = 0;
 
+// 「斜め」だと大きく横を向く必要があるように誤解されるため、目安の角度レンジを数値で示す
+// （既存のpalmFacingAngleDeg表示を流用し、自然なブレの範囲内で3回撮ればよいことが伝わるようにする）
+const STANDARD_DIRECTIONS = [
+  { label: '1回目', min: 0, max: 15 },
+  { label: '2回目', min: 15, max: 35 },
+  { label: '3回目', min: 35, max: 60 },
+];
+
 function renderCalibDirectionList() {
   calibDirectionList.innerHTML = '';
-  calibDirections.forEach((label, i) => {
+  calibDirections.forEach((dir, i) => {
     const row = document.createElement('div');
     row.className = 'calib-direction-row';
+    row.dataset.min = dir.min;
+    row.dataset.max = dir.max;
 
     const labelSpan = document.createElement('span');
     labelSpan.className = 'dir-label';
-    labelSpan.textContent = label;
+    labelSpan.textContent = dir.label;
+
+    const targetSpan = document.createElement('span');
+    targetSpan.className = 'dir-target';
+    targetSpan.textContent = `目安: ${dir.min}〜${dir.max}度`;
 
     const checkSpan = document.createElement('span');
     checkSpan.className = 'dir-check';
@@ -686,6 +715,7 @@ function renderCalibDirectionList() {
     btn.addEventListener('click', () => captureDirection(i));
 
     row.appendChild(labelSpan);
+    row.appendChild(targetSpan);
     row.appendChild(checkSpan);
     row.appendChild(btn);
     calibDirectionList.appendChild(row);
@@ -693,6 +723,21 @@ function renderCalibDirectionList() {
 
   const ready = calibCaptures.length >= 3 && calibCaptures.every(c => c !== null);
   calibFinishBtn.disabled = !ready;
+  updateCalibLiveAngle();
+}
+
+function updateCalibLiveAngle() {
+  if (!calibContent.classList.contains('visible')) return;
+  if (latestFacingAngle === null) {
+    calibCurrentAngle.textContent = '現在の角度: 検出待ち';
+    calibDirectionList.querySelectorAll('.calib-direction-row').forEach(r => r.classList.remove('in-range'));
+    return;
+  }
+  calibCurrentAngle.textContent = `現在の角度: ${Math.round(latestFacingAngle)}度`;
+  calibDirectionList.querySelectorAll('.calib-direction-row').forEach(r => {
+    const inRange = latestFacingAngle >= Number(r.dataset.min) && latestFacingAngle <= Number(r.dataset.max);
+    r.classList.toggle('in-range', inRange);
+  });
 }
 
 function captureDirection(i) {
@@ -707,20 +752,19 @@ function captureDirection(i) {
     return;
   }
   const normalized = normalizeLandmarks(latestLandmarks);
-  calibCaptures[i] = { angleLabel: calibDirections[i], landmarks: normalized };
-  calibCaptureStatus.textContent = `「${calibDirections[i]}」を撮影しました`;
+  calibCaptures[i] = { angleLabel: calibDirections[i].label, landmarks: normalized };
+  calibCaptureStatus.textContent = `「${calibDirections[i].label}」を撮影しました（${Math.round(latestFacingAngle ?? 0)}度）`;
   renderCalibDirectionList();
 }
 
 function addExtendDirection() {
-  const extraIndex = calibDirections.length - 2;
-  calibDirections.push(`追加${extraIndex}`);
+  calibDirections.push({ label: `追加${calibDirections.length - 2}`, min: 0, max: 75 });
   calibCaptures.push(null);
   renderCalibDirectionList();
 }
 
 function startCaptureFlow() {
-  calibDirections = ['正面', '斜め①', '斜め②'];
+  calibDirections = STANDARD_DIRECTIONS.map(d => ({ ...d }));
   calibCaptures = [null, null, null];
   calibCaptureStatus.textContent = '';
   const existing = poseCalibrations[calibPoseId];
@@ -1114,6 +1158,7 @@ function clearDisplays(message) {
   palmValue.textContent = '-';
   lastToggleState = null;
   latestHandDetected = false;
+  latestFacingAngle = null;
   resetHold();
   poseResult.textContent = message;
   poseRows.forEach(row => row.classList.remove('active'));
@@ -1182,6 +1227,7 @@ async function init() {
 let latestLandmarks = null;
 let latestFingerPattern = null;
 let latestHandDetected = false;
+let latestFacingAngle = null;
 
 let lastTime = -1;
 function loop() {
@@ -1199,6 +1245,7 @@ function loop() {
       palmValue.textContent = '-';
       lastToggleState = null;
       latestHandDetected = false;
+      latestFacingAngle = null;
       resetHold();
       poseResult.textContent = '両手が検出されたため一時停止中（片手にしてください）';
       poseRows.forEach(row => row.classList.remove('active'));
@@ -1220,6 +1267,7 @@ function loop() {
 
       latestLandmarks = landmarks;
       latestFingerPattern = { thumbOn, otherCount };
+      latestFacingAngle = facingAngle;
       latestHandDetected = true;
 
       if (!facingCamera) {
@@ -1245,10 +1293,12 @@ function loop() {
       palmValue.textContent = '-';
       lastToggleState = null;
       latestHandDetected = false;
+      latestFacingAngle = null;
       resetHold();
       poseResult.textContent = '手が検出されていません';
       poseRows.forEach(row => row.classList.remove('active'));
     }
+    updateCalibLiveAngle();
   }
   rafId = requestAnimationFrame(loop);
 }
