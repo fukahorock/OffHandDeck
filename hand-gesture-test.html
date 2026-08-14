@@ -360,6 +360,14 @@
     <div id="holdBar"><div id="holdBarFill"></div></div>
 
     <div class="hold-slider">
+      <label>ジェスチャーに使う手:
+        <select id="gestureHandSelect">
+          <option value="Right">右手</option>
+          <option value="Left">左手</option>
+        </select>
+      </label>
+    </div>
+    <div class="hold-slider">
       <label for="holdMsSlider">判定時間: <span id="holdMsLabel">1000</span>ms</label>
       <input type="range" id="holdMsSlider" min="300" max="1500" step="50" value="1000">
     </div>
@@ -475,6 +483,7 @@ const repeatMsLabel = document.getElementById('repeatMsLabel');
 const facingAngleSlider = document.getElementById('facingAngleSlider');
 const facingAngleLabel = document.getElementById('facingAngleLabel');
 const facingCheckToggle = document.getElementById('facingCheckToggle');
+const gestureHandSelect = document.getElementById('gestureHandSelect');
 const tabBtns = document.querySelectorAll('.tab-btn');
 const poseListPane = document.getElementById('poseListPane');
 const calibPane = document.getElementById('calibPane');
@@ -581,6 +590,18 @@ function smoothThumbOn(rawThumbOn) {
 function resetThumbSmoothing() {
   thumbHistory = [];
 }
+
+// MediaPipeのhandedness判定は「入力画像が鏡像（セルフィーカメラ）である」前提で出力されるが、
+// ここではvideo要素の生データ（鏡像化していない）をそのまま渡しているため左右が逆に出る。
+// 画面表示（CSSで鏡像化した見た目）上の実際の手と一致させるため、ジェスチャー対象手の判定にはこちらを使う。
+function realHandedness(rawHandedness) {
+  return rawHandedness === 'Left' ? 'Right' : 'Left';
+}
+
+let gestureHand = gestureHandSelect.value;
+gestureHandSelect.addEventListener('change', () => {
+  gestureHand = gestureHandSelect.value;
+});
 
 // 手首→人差し指付け根→小指付け根の3点から手のひらの法線（向き）を計算する
 // （頬・顎に手を当てるポーズは手のひらが真横〜背面を向くため、これで除外できる）
@@ -1321,41 +1342,58 @@ function loop() {
       poseRows.forEach(row => row.classList.remove('active'));
     } else if (handCount === 1) {
       const landmarks = result.landmarks[0];
-      const handedness = result.handednesses && result.handednesses[0] && result.handednesses[0][0]
+      const rawHandedness = result.handednesses && result.handednesses[0] && result.handednesses[0][0]
         ? result.handednesses[0][0].categoryName
         : 'Right';
-      const facingAngle = palmFacingAngleDeg(landmarks, handedness);
-      const facingCamera = !facingCheckEnabled || facingAngle <= FACING_ANGLE_LIMIT;
-      drawLandmarks([landmarks], facingCamera ? '#00e0ff' : '#888');
-      palmValue.textContent = facingCheckEnabled
-        ? `${facingCamera ? 'カメラ向き' : 'そっぽ向き'} (${Math.round(facingAngle)}°)`
-        : `チェック無効 (${Math.round(facingAngle)}°)`;
+      const detectedHand = realHandedness(rawHandedness);
 
-      const raw = judgeFingerPattern(landmarks);
-      const thumbOn = smoothThumbOn(raw.thumbOn);
-      const otherCount = raw.otherCount;
-      thumbValue.textContent = thumbOn ? 'ON' : 'OFF';
-      countValue.textContent = otherCount;
-
-      latestLandmarks = landmarks;
-      latestFingerPattern = { thumbOn, otherCount };
-      latestFacingAngle = facingAngle;
-      latestHandDetected = true;
-
-      if (!facingCamera) {
+      if (detectedHand !== gestureHand) {
+        drawLandmarks([landmarks], '#666');
+        thumbValue.textContent = '-';
+        countValue.textContent = '-';
+        palmValue.textContent = '-';
         lastToggleState = null;
+        latestHandDetected = false;
+        latestFacingAngle = null;
+        resetThumbSmoothing();
         resetHold();
-        poseResult.textContent = '手のひらがカメラを向いていません（判定停止中）';
+        const gestureHandLabel = gestureHand === 'Right' ? '右手' : '左手';
+        poseResult.textContent = `対象外の手が検出されています（${gestureHandLabel}でジェスチャーしてください）`;
         poseRows.forEach(row => row.classList.remove('active'));
       } else {
-        handleToggleDetection(thumbOn, otherCount);
+        const facingAngle = palmFacingAngleDeg(landmarks, rawHandedness);
+        const facingCamera = !facingCheckEnabled || facingAngle <= FACING_ANGLE_LIMIT;
+        drawLandmarks([landmarks], facingCamera ? '#00e0ff' : '#888');
+        palmValue.textContent = facingCheckEnabled
+          ? `${facingCamera ? 'カメラ向き' : 'そっぽ向き'} (${Math.round(facingAngle)}°)`
+          : `チェック無効 (${Math.round(facingAngle)}°)`;
 
-        if (trackingOn) {
-          judgeAndConfirm(thumbOn, otherCount, landmarks);
-        } else {
+        const raw = judgeFingerPattern(landmarks);
+        const thumbOn = smoothThumbOn(raw.thumbOn);
+        const otherCount = raw.otherCount;
+        thumbValue.textContent = thumbOn ? 'ON' : 'OFF';
+        countValue.textContent = otherCount;
+
+        latestLandmarks = landmarks;
+        latestFingerPattern = { thumbOn, otherCount };
+        latestFacingAngle = facingAngle;
+        latestHandDetected = true;
+
+        if (!facingCamera) {
+          lastToggleState = null;
           resetHold();
-          poseResult.textContent = 'OFF中（トグル検出のみ動作中）';
+          poseResult.textContent = '手のひらがカメラを向いていません（判定停止中）';
           poseRows.forEach(row => row.classList.remove('active'));
+        } else {
+          handleToggleDetection(thumbOn, otherCount);
+
+          if (trackingOn) {
+            judgeAndConfirm(thumbOn, otherCount, landmarks);
+          } else {
+            resetHold();
+            poseResult.textContent = 'OFF中（トグル検出のみ動作中）';
+            poseRows.forEach(row => row.classList.remove('active'));
+          }
         }
       }
     } else {
