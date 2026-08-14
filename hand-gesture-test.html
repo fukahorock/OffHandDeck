@@ -228,6 +228,10 @@
       <label for="repeatMsSlider">連射間隔: <span id="repeatMsLabel">1500</span>ms</label>
       <input type="range" id="repeatMsSlider" min="800" max="4000" step="100" value="1500">
     </div>
+    <div class="hold-slider">
+      <label for="facingAngleSlider">手のひら許容角度: <span id="facingAngleLabel">75</span>度</label>
+      <input type="range" id="facingAngleSlider" min="30" max="90" step="5" value="75">
+    </div>
   </div>
 
   <div class="right">
@@ -284,6 +288,8 @@ const holdMsSlider = document.getElementById('holdMsSlider');
 const holdMsLabel = document.getElementById('holdMsLabel');
 const repeatMsSlider = document.getElementById('repeatMsSlider');
 const repeatMsLabel = document.getElementById('repeatMsLabel');
+const facingAngleSlider = document.getElementById('facingAngleSlider');
+const facingAngleLabel = document.getElementById('facingAngleLabel');
 
 // landmark index定義（MediaPipe Hands準拠）
 const WRIST = 0;
@@ -331,17 +337,33 @@ function judgeFingerPattern(landmarks) {
   return { thumbOn, otherCount };
 }
 
-// 手首→人差し指付け根→小指付け根の並びから、手のひらがカメラを向いているか推定する
-// （頬・顎に手を当てるポーズは手のひらが横を向くため、これで判定対象から除外する）
-// 符号は左右の手でミラー関係になるため反転が必要。仮の実装で符号は実測して調整すること。
-function isPalmFacingCamera(landmarks, handedness) {
+// 手首→人差し指付け根→小指付け根の3点から手のひらの法線（向き）を計算する
+// （頬・顎に手を当てるポーズは手のひらが真横〜背面を向くため、これで除外できる）
+// 左右の手でミラー関係になるため、法線の向きをhandednessで反転して揃える。
+function palmNormal(landmarks, handedness) {
   const wrist = landmarks[WRIST];
   const indexMcp = landmarks[5];
   const pinkyMcp = landmarks[PINKY_MCP];
-  const v1x = indexMcp.x - wrist.x, v1y = indexMcp.y - wrist.y;
-  const v2x = pinkyMcp.x - wrist.x, v2y = pinkyMcp.y - wrist.y;
-  const crossZ = v1x * v2y - v1y * v2x;
-  return handedness === 'Left' ? crossZ > 0 : crossZ < 0;
+  const v1 = { x: indexMcp.x - wrist.x, y: indexMcp.y - wrist.y, z: indexMcp.z - wrist.z };
+  const v2 = { x: pinkyMcp.x - wrist.x, y: pinkyMcp.y - wrist.y, z: pinkyMcp.z - wrist.z };
+  let n = {
+    x: v1.y * v2.z - v1.z * v2.y,
+    y: v1.z * v2.x - v1.x * v2.z,
+    z: v1.x * v2.y - v1.y * v2.x,
+  };
+  if (handedness === 'Left') {
+    n = { x: -n.x, y: -n.y, z: -n.z };
+  }
+  return n;
+}
+
+// 法線とカメラ方向（MediaPipeのz規約では負のzがカメラに近い）との角度[度]を返す
+// 0度＝真正面、90度＝真横、180度＝背面。仮の実装で正面0度の想定は実測して調整すること。
+function palmFacingAngleDeg(landmarks, handedness) {
+  const n = palmNormal(landmarks, handedness);
+  const mag = Math.sqrt(n.x * n.x + n.y * n.y + n.z * n.z) || 1;
+  const cosAngle = Math.max(-1, Math.min(1, -n.z / mag));
+  return Math.acos(cosAngle) * (180 / Math.PI);
 }
 
 function findMatchingRow(thumbOn, otherCount) {
@@ -406,6 +428,13 @@ let REPEAT_MS = Number(repeatMsSlider.value);
 repeatMsSlider.addEventListener('input', () => {
   REPEAT_MS = Number(repeatMsSlider.value);
   repeatMsLabel.textContent = REPEAT_MS;
+});
+
+// 手のひら向きの許容角度（真正面からこの角度以内なら「向いている」とみなす）
+let FACING_ANGLE_LIMIT = Number(facingAngleSlider.value);
+facingAngleSlider.addEventListener('input', () => {
+  FACING_ANGLE_LIMIT = Number(facingAngleSlider.value);
+  facingAngleLabel.textContent = FACING_ANGLE_LIMIT;
 });
 document.querySelectorAll('.repeat-checkbox').forEach(cb => {
   cb.closest('tr').dataset.repeat = 'false';
@@ -652,9 +681,10 @@ function loop() {
       const handedness = result.handednesses && result.handednesses[0] && result.handednesses[0][0]
         ? result.handednesses[0][0].categoryName
         : 'Right';
-      const facingCamera = isPalmFacingCamera(landmarks, handedness);
+      const facingAngle = palmFacingAngleDeg(landmarks, handedness);
+      const facingCamera = facingAngle <= FACING_ANGLE_LIMIT;
       drawLandmarks([landmarks], facingCamera ? '#00e0ff' : '#888');
-      palmValue.textContent = facingCamera ? 'カメラ向き' : 'そっぽ向き';
+      palmValue.textContent = `${facingCamera ? 'カメラ向き' : 'そっぽ向き'} (${Math.round(facingAngle)}°)`;
 
       const { thumbOn, otherCount } = judgeFingerPattern(landmarks);
       thumbValue.textContent = thumbOn ? 'ON' : 'OFF';
