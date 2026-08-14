@@ -158,6 +158,16 @@
     width: 0%;
     background: #4caf50;
   }
+  .hold-slider {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #ccc;
+  }
+  .hold-slider input[type="range"] {
+    width: 200px;
+    vertical-align: middle;
+    margin-left: 8px;
+  }
   tr.reserved td {
     color: #888;
     font-style: italic;
@@ -200,6 +210,11 @@
 
     <div id="poseResult">-</div>
     <div id="holdBar"><div id="holdBarFill"></div></div>
+
+    <div class="hold-slider">
+      <label for="holdMsSlider">判定時間: <span id="holdMsLabel">1000</span>ms</label>
+      <input type="range" id="holdMsSlider" min="300" max="1500" step="50" value="1000">
+    </div>
   </div>
 
   <div class="right">
@@ -248,6 +263,8 @@ const trackingBadge = document.getElementById('trackingBadge');
 const toggleLog = document.getElementById('toggleLog');
 const resetLogBtn = document.getElementById('resetLogBtn');
 const holdBarFill = document.getElementById('holdBarFill');
+const holdMsSlider = document.getElementById('holdMsSlider');
+const holdMsLabel = document.getElementById('holdMsLabel');
 
 // landmark index定義（MediaPipe Hands準拠）
 const WRIST = 0;
@@ -324,8 +341,12 @@ function playConfirmSound() {
   osc.stop(now + 0.2);
 }
 
-// 静的ポーズを1〜1.5秒保持したら確定（仕様の下限である1秒に設定）
-const HOLD_MS = 1000;
+// 静的ポーズを1〜1.5秒保持したら確定（スライダーで調整可能、デフォルトは仕様下限の1秒）
+let HOLD_MS = Number(holdMsSlider.value);
+holdMsSlider.addEventListener('input', () => {
+  HOLD_MS = Number(holdMsSlider.value);
+  holdMsLabel.textContent = HOLD_MS;
+});
 let holdRow = null;
 let holdStartTime = null;
 let confirmed = false;
@@ -427,22 +448,24 @@ resetLogBtn.addEventListener('click', () => {
   renderToggleLog();
 });
 
-function drawLandmarks(landmarks) {
+function drawLandmarks(landmarksList, color) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = '#00e0ff';
-  ctx.lineWidth = 2;
-  for (const [a, b] of CONNECTIONS) {
-    const p1 = landmarks[a], p2 = landmarks[b];
-    ctx.beginPath();
-    ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
-    ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
-    ctx.stroke();
-  }
-  ctx.fillStyle = '#ffd479';
-  for (const p of landmarks) {
-    ctx.beginPath();
-    ctx.arc(p.x * canvas.width, p.y * canvas.height, 4, 0, Math.PI * 2);
-    ctx.fill();
+  for (const landmarks of landmarksList) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    for (const [a, b] of CONNECTIONS) {
+      const p1 = landmarks[a], p2 = landmarks[b];
+      ctx.beginPath();
+      ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
+      ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
+      ctx.stroke();
+    }
+    ctx.fillStyle = color;
+    for (const p of landmarks) {
+      ctx.beginPath();
+      ctx.arc(p.x * canvas.width, p.y * canvas.height, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
 
@@ -459,7 +482,7 @@ async function init() {
       delegate: "CPU"
     },
     runningMode: "VIDEO",
-    numHands: 1
+    numHands: 2
   });
 
   status.textContent = 'カメラへのアクセスを許可してください';
@@ -481,9 +504,19 @@ function loop() {
     lastTime = video.currentTime;
     const result = handLandmarker.detectForVideo(video, performance.now());
 
-    if (result.landmarks && result.landmarks.length > 0) {
+    const handCount = result.landmarks ? result.landmarks.length : 0;
+
+    if (handCount >= 2) {
+      drawLandmarks(result.landmarks, '#e05555');
+      thumbValue.textContent = '-';
+      countValue.textContent = '-';
+      lastToggleState = null;
+      resetHold();
+      poseResult.textContent = '両手が検出されたため一時停止中（片手にしてください）';
+      poseRows.forEach(row => row.classList.remove('active'));
+    } else if (handCount === 1) {
       const landmarks = result.landmarks[0];
-      drawLandmarks(landmarks);
+      drawLandmarks([landmarks], '#00e0ff');
       const { thumbOn, otherCount } = judgeFingerPattern(landmarks);
       thumbValue.textContent = thumbOn ? 'ON' : 'OFF';
       countValue.textContent = otherCount;
@@ -501,6 +534,7 @@ function loop() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       thumbValue.textContent = '-';
       countValue.textContent = '-';
+      lastToggleState = null;
       resetHold();
       poseResult.textContent = '手が検出されていません';
       poseRows.forEach(row => row.classList.remove('active'));
