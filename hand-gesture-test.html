@@ -526,8 +526,11 @@ const brightnessCanvas = document.createElement('canvas');
 brightnessCanvas.width = 32;
 brightnessCanvas.height = 18;
 const brightnessCtx = brightnessCanvas.getContext('2d', { willReadFrequently: true });
-const DARK_THRESHOLD = 15; // 0-255の平均輝度。仮の値
+// 部屋の明るさは環境ごとに違うため、絶対値ではなく「直前の明るさに対する相対的な低下」で判定する
+const DARK_RATIO = 0.5; // 直近の明るさの何割まで下がったら暗所とみなすか。仮の値
 const DARK_HOLD_MS = 300; // 誤検知防止のため、この時間暗いままなら発動。仮の値
+const BASELINE_ALPHA = 0.05; // 平常時の明るさに追従する速さ（覆われている間は更新しない）
+let baselineBrightness = null;
 let darkStartTime = null;
 
 function getAverageBrightness() {
@@ -543,13 +546,18 @@ function getAverageBrightness() {
 
 function checkDarkAutoOff() {
   const brightness = getAverageBrightness();
-  if (brightness < DARK_THRESHOLD) {
+  if (baselineBrightness === null) baselineBrightness = brightness;
+
+  const isDarkCandidate = brightness < baselineBrightness * DARK_RATIO;
+
+  if (isDarkCandidate) {
     if (darkStartTime === null) darkStartTime = performance.now();
     if (trackingOn && performance.now() - darkStartTime >= DARK_HOLD_MS) {
       setTracking(false, 'dark');
     }
   } else {
     darkStartTime = null;
+    baselineBrightness = baselineBrightness * (1 - BASELINE_ALPHA) + brightness * BASELINE_ALPHA;
   }
 }
 
