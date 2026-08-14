@@ -324,8 +324,8 @@ function playConfirmSound() {
   osc.stop(now + 0.2);
 }
 
-// 静的ポーズを1〜1.5秒保持したら確定（仕様に基づく。ここでは仮に1.2秒とする）
-const HOLD_MS = 1200;
+// 静的ポーズを1〜1.5秒保持したら確定（仕様の下限である1秒に設定）
+const HOLD_MS = 1000;
 let holdRow = null;
 let holdStartTime = null;
 let confirmed = false;
