@@ -22,16 +22,33 @@
     font-size: 14px;
     color: #9cf;
   }
+  button {
+    margin: 12px;
+    padding: 8px 20px;
+    font-size: 14px;
+    border: none;
+    border-radius: 6px;
+    background: #3a6ea5;
+    color: #fff;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #4a80bb;
+  }
 </style>
 </head>
 <body>
 <h1>カメラテスト</h1>
 <p id="status">カメラへのアクセスを許可してください</p>
+<div>
+  <button id="toggleBtn">カメラを非表示にする</button>
+</div>
 <video id="video" autoplay playsinline></video>
 
 <script>
   const video = document.getElementById('video');
   const status = document.getElementById('status');
+  const toggleBtn = document.getElementById('toggleBtn');
 
   navigator.mediaDevices.getUserMedia({ video: true, audio: false })
     .then(stream => {
@@ -41,6 +58,12 @@
     .catch(err => {
       status.textContent = 'カメラにアクセスできませんでした: ' + err.message;
     });
+
+  toggleBtn.addEventListener('click', () => {
+    const hidden = video.style.display === 'none';
+    video.style.display = hidden ? '' : 'none';
+    toggleBtn.textContent = hidden ? 'カメラを非表示にする' : 'カメラを表示する';
+  });
 </script>
 </body>
 </html>
