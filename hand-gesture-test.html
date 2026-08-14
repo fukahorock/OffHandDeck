@@ -290,48 +290,31 @@
   #calibCaptureArea.visible {
     display: block;
   }
-  .calib-direction-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 6px 0;
-    font-size: 13px;
+  #calibRecordBar {
+    width: 260px;
+    height: 8px;
+    background: #444;
+    border-radius: 4px;
+    margin: 10px 0;
+    overflow: hidden;
   }
-  .calib-direction-row .dir-label {
-    width: 60px;
+  #calibRecordBarFill {
+    height: 100%;
+    width: 0%;
+    background: #4caf50;
   }
-  .calib-direction-row .dir-target {
-    width: 140px;
-    color: #999;
-  }
-  .calib-direction-row.in-range .dir-target {
-    color: #7fd18a;
-    font-weight: bold;
-  }
-  .calib-direction-row .dir-check {
-    color: #7fd18a;
-    width: 20px;
-  }
-  .calib-direction-row button {
-    padding: 4px 10px;
-    font-size: 12px;
-    border: none;
-    border-radius: 6px;
-    background: #3a6ea5;
-    color: #fff;
-    cursor: pointer;
-  }
-  #calibCurrentAngle {
+  #calibLiveStatus {
     font-size: 13px;
     color: #ccc;
-    margin: 8px 0;
+    min-height: 18px;
   }
-  #calibCaptureStatus {
+  #calibResultSummary {
     font-size: 13px;
     color: #f0a840;
     min-height: 18px;
+    white-space: pre-line;
   }
-  #calibFinishBtn, #calibCancelBtn, #calibClearBtn, #calibExtendBtn {
+  #calibRecordBtn, #calibCancelBtn, #calibClearBtn {
     padding: 6px 14px;
     font-size: 13px;
     border: none;
@@ -435,19 +418,19 @@
         </div>
 
         <div id="calibCaptureArea">
-          <p class="calib-hint">対象ポーズの指の形を作り、各行の目安の角度に近づけてから撮影してください。無理に横を向く必要はなく、自然に構えたままで大丈夫です。</p>
-          <p id="calibCurrentAngle">現在の角度: -</p>
-          <div id="calibDirectionList"></div>
-          <button id="calibExtendBtn">向きを追加（拡張モード）</button>
-          <p id="calibCaptureStatus"></p>
+          <p class="calib-hint">対象ポーズの指の形を作ったら「記録開始」を押し、あとは狙わず自然に手を動かしてください（正面〜横〜裏まで、無理のない範囲で構いません）。その間の自然な状態を自動で記録・分析します。</p>
+
+          <button id="calibRecordBtn">記録開始（5秒）</button>
+          <div id="calibRecordBar"><div id="calibRecordBarFill"></div></div>
+          <p id="calibLiveStatus"></p>
+          <p id="calibResultSummary"></p>
 
           <div class="hold-slider">
             <label for="calibAdjustSlider">緩め ←─●───→ 厳しめ: <span id="calibAdjustLabel">0.00</span></label>
             <input type="range" id="calibAdjustSlider" min="-0.15" max="0.15" step="0.01" value="0">
           </div>
 
-          <button id="calibFinishBtn">完了して保存</button>
-          <button id="calibCancelBtn">キャンセル</button>
+          <button id="calibCancelBtn">閉じる</button>
           <button id="calibClearBtn">キャリブレーションを削除</button>
         </div>
       </div>
@@ -504,13 +487,12 @@ const calibReuseText = document.getElementById('calibReuseText');
 const calibReuseUseBtn = document.getElementById('calibReuseUseBtn');
 const calibReuseRedoBtn = document.getElementById('calibReuseRedoBtn');
 const calibCaptureArea = document.getElementById('calibCaptureArea');
-const calibDirectionList = document.getElementById('calibDirectionList');
-const calibCurrentAngle = document.getElementById('calibCurrentAngle');
-const calibExtendBtn = document.getElementById('calibExtendBtn');
-const calibCaptureStatus = document.getElementById('calibCaptureStatus');
+const calibRecordBtn = document.getElementById('calibRecordBtn');
+const calibRecordBarFill = document.getElementById('calibRecordBarFill');
+const calibLiveStatus = document.getElementById('calibLiveStatus');
+const calibResultSummary = document.getElementById('calibResultSummary');
 const calibAdjustSlider = document.getElementById('calibAdjustSlider');
 const calibAdjustLabel = document.getElementById('calibAdjustLabel');
-const calibFinishBtn = document.getElementById('calibFinishBtn');
 const calibCancelBtn = document.getElementById('calibCancelBtn');
 const calibClearBtn = document.getElementById('calibClearBtn');
 const thumbThresholdInfo = document.getElementById('thumbThresholdInfo');
@@ -714,7 +696,7 @@ function updateCalibStatusLabel(row) {
   const calib = poseCalibrations[poseId(row)];
   if (calib) {
     const dateStr = new Date(calib.calibratedAt).toLocaleDateString('ja-JP');
-    statusEl.textContent = `設定済み(${calib.templates.length}方向) ${dateStr}`;
+    statusEl.textContent = `設定済み(サンプル${calib.templates.length}件) ${dateStr}`;
     statusEl.classList.add('done');
   } else {
     statusEl.textContent = '未設定';
@@ -724,137 +706,95 @@ function updateCalibStatusLabel(row) {
 
 let calibTargetRow = null;
 let calibPoseId = null;
-let calibDirections = [];
-let calibCaptures = [];
 let calibCurrentAdjustment = 0;
 
-// 「斜め」だと大きく横を向く必要があるように誤解されるため、目安の角度レンジを数値で示す
-// （既存のpalmFacingAngleDeg表示を流用し、自然なブレの範囲内で3回撮ればよいことが伝わるようにする）
-const STANDARD_DIRECTIONS = [
-  { label: '1回目', min: 0, max: 15 },
-  { label: '2回目', min: 15, max: 35 },
-  { label: '3回目', min: 35, max: 60 },
-];
+// 目標の角度に自分から合わせにいく方式だと「試験に受かりにいく」動きになってしまうため、
+// 一定時間ただ自然に手を動かしてもらい、その間にポーズが一致したフレームを自動で記録する方式にしている。
+// 記録時間・上限件数は仮の値。
+const CALIB_RECORD_DURATION_MS = 5000;
+const CALIB_MAX_TEMPLATES = 8;
+const CALIB_MIN_SAMPLES = 3;
 
-function renderCalibDirectionList() {
-  calibDirectionList.innerHTML = '';
-  calibDirections.forEach((dir, i) => {
-    const row = document.createElement('div');
-    row.className = 'calib-direction-row';
-    row.dataset.min = dir.min;
-    row.dataset.max = dir.max;
+let calibRecording = false;
+let calibRecordStartTime = null;
+let calibRecordSamples = [];
 
-    const labelSpan = document.createElement('span');
-    labelSpan.className = 'dir-label';
-    labelSpan.textContent = dir.label;
-
-    const targetSpan = document.createElement('span');
-    targetSpan.className = 'dir-target';
-    targetSpan.textContent = `目安: ${dir.min}〜${dir.max}度`;
-
-    const checkSpan = document.createElement('span');
-    checkSpan.className = 'dir-check';
-    checkSpan.textContent = calibCaptures[i] ? '✓' : '';
-
-    const btn = document.createElement('button');
-    btn.textContent = calibCaptures[i] ? '再撮影' : '撮影';
-    btn.addEventListener('click', () => captureDirection(i));
-
-    row.appendChild(labelSpan);
-    row.appendChild(targetSpan);
-    row.appendChild(checkSpan);
-    row.appendChild(btn);
-    calibDirectionList.appendChild(row);
-  });
-
-  const ready = calibCaptures.length >= 3 && calibCaptures.every(c => c !== null);
-  calibFinishBtn.disabled = !ready;
-  updateCalibLiveAngle();
+function startRecording() {
+  calibRecording = true;
+  calibRecordStartTime = performance.now();
+  calibRecordSamples = [];
+  calibResultSummary.textContent = '';
+  calibRecordBtn.disabled = true;
+  calibRecordBtn.textContent = '記録中...';
 }
 
-function updateCalibLiveAngle() {
-  if (!calibContent.classList.contains('visible')) return;
-  if (latestFacingAngle === null) {
-    calibCurrentAngle.textContent = '現在の角度: 検出待ち';
-    calibDirectionList.querySelectorAll('.calib-direction-row').forEach(r => r.classList.remove('in-range'));
-    return;
-  }
-  calibCurrentAngle.textContent = `現在の角度: ${Math.round(latestFacingAngle)}度`;
-  calibDirectionList.querySelectorAll('.calib-direction-row').forEach(r => {
-    const inRange = latestFacingAngle >= Number(r.dataset.min) && latestFacingAngle <= Number(r.dataset.max);
-    r.classList.toggle('in-range', inRange);
-  });
-}
+// loopから毎フレーム呼ばれ、記録中であれば現在のフレームを条件付きでサンプリングする
+function sampleCalibrationFrame() {
+  if (!calibRecording) return;
 
-function captureDirection(i) {
-  if (!latestHandDetected || !latestLandmarks) {
-    calibCaptureStatus.textContent = '手が検出されていません';
+  const elapsed = performance.now() - calibRecordStartTime;
+  const progress = Math.min(elapsed / CALIB_RECORD_DURATION_MS, 1);
+  calibRecordBarFill.style.width = `${progress * 100}%`;
+
+  if (progress >= 1) {
+    finishRecording();
     return;
   }
+
   const wantThumb = calibTargetRow.dataset.thumb === 'true';
   const wantCount = Number(calibTargetRow.dataset.count);
-  if (!latestFingerPattern || latestFingerPattern.thumbOn !== wantThumb || latestFingerPattern.otherCount !== wantCount) {
-    calibCaptureStatus.textContent = '現在の指の形がこのポーズと一致していません';
+  const matched = latestHandDetected && latestFingerPattern &&
+    latestFingerPattern.thumbOn === wantThumb && latestFingerPattern.otherCount === wantCount;
+
+  if (matched) {
+    calibRecordSamples.push({
+      landmarks: normalizeLandmarks(latestLandmarks),
+      thumbIpAngle: angleAtPoint(latestLandmarks[2], latestLandmarks[3], latestLandmarks[4]),
+      facingAngle: latestFacingAngle,
+    });
+  }
+
+  const remainSec = Math.ceil((CALIB_RECORD_DURATION_MS - elapsed) / 1000);
+  calibLiveStatus.textContent = matched
+    ? `記録中... 残り${remainSec}秒／${calibRecordSamples.length}件記録（現在: 一致）`
+    : `記録中... 残り${remainSec}秒／${calibRecordSamples.length}件記録（現在: 不一致。そのままで大丈夫です）`;
+}
+
+// 記録した中から、観測された角度になるべく偏りなく代表サンプルを選ぶ
+function pickRepresentativeSamples(samples) {
+  const sorted = [...samples].sort((a, b) => a.facingAngle - b.facingAngle);
+  const targetCount = Math.min(CALIB_MAX_TEMPLATES, sorted.length);
+  const picked = [];
+  for (let k = 0; k < targetCount; k++) {
+    const idx = Math.round((k * (sorted.length - 1)) / Math.max(targetCount - 1, 1));
+    picked.push(sorted[idx]);
+  }
+  return picked;
+}
+
+function finishRecording() {
+  calibRecording = false;
+  calibRecordBtn.disabled = false;
+  calibRecordBtn.textContent = '記録開始（5秒）';
+  calibRecordBarFill.style.width = '0%';
+
+  const samples = calibRecordSamples;
+  calibRecordSamples = [];
+
+  if (samples.length < CALIB_MIN_SAMPLES) {
+    calibLiveStatus.textContent = '';
+    calibResultSummary.textContent = `十分なデータが取れませんでした（${samples.length}件）。もう一度お試しください。`;
     return;
   }
-  const normalized = normalizeLandmarks(latestLandmarks);
-  const thumbIpAngle = angleAtPoint(latestLandmarks[2], latestLandmarks[3], latestLandmarks[4]);
-  calibCaptures[i] = { angleLabel: calibDirections[i].label, landmarks: normalized, thumbIpAngle };
-  calibCaptureStatus.textContent = `「${calibDirections[i].label}」を撮影しました（${Math.round(latestFacingAngle ?? 0)}度）`;
-  renderCalibDirectionList();
-}
 
-function addExtendDirection() {
-  calibDirections.push({ label: `追加${calibDirections.length - 2}`, min: 0, max: 75 });
-  calibCaptures.push(null);
-  renderCalibDirectionList();
-}
-
-function startCaptureFlow() {
-  calibDirections = STANDARD_DIRECTIONS.map(d => ({ ...d }));
-  calibCaptures = [null, null, null];
-  calibCaptureStatus.textContent = '';
-  const existing = poseCalibrations[calibPoseId];
-  calibCurrentAdjustment = existing ? existing.thresholdAdjustment : 0;
-  calibAdjustSlider.value = calibCurrentAdjustment;
-  calibAdjustLabel.textContent = calibCurrentAdjustment.toFixed(2);
-  calibReuseDialog.classList.remove('visible');
-  calibCaptureArea.classList.add('visible');
-  renderCalibDirectionList();
-}
-
-function openCalibration(row) {
-  calibTargetRow = row;
-  calibPoseId = poseId(row);
-  calibPoseName.textContent = row.children[1].textContent;
-
-  const existing = poseCalibrations[calibPoseId];
-  if (existing) {
-    const dateStr = new Date(existing.calibratedAt).toLocaleString('ja-JP');
-    calibReuseText.textContent = `${dateStr} に取得したデータがあります。このまま使いますか？撮り直しますか？`;
-    calibReuseDialog.classList.add('visible');
-    calibCaptureArea.classList.remove('visible');
-  } else {
-    calibReuseDialog.classList.remove('visible');
-    startCaptureFlow();
-  }
-  calibEmptyHint.style.display = 'none';
-  calibContent.classList.add('visible');
-  switchTab('calib');
-}
-
-function closeCalibration() {
-  calibContent.classList.remove('visible');
-  calibEmptyHint.style.display = '';
-  calibTargetRow = null;
-  calibPoseId = null;
-  switchTab('list');
-}
-
-function finishCalibration() {
-  if (calibCaptures.filter(Boolean).length < 3) return;
-  const templates = calibCaptures.map(c => ({ angleLabel: c.angleLabel, landmarks: c.landmarks, thumbIpAngle: c.thumbIpAngle }));
+  const picked = pickRepresentativeSamples(samples);
+  const templates = picked.map(s => ({
+    angleLabel: `${Math.round(s.facingAngle)}度`,
+    landmarks: s.landmarks,
+    thumbIpAngle: s.thumbIpAngle,
+  }));
   const threshold = computeThreshold(templates);
+
   poseCalibrations[calibPoseId] = {
     templates,
     threshold,
@@ -864,7 +804,53 @@ function finishCalibration() {
   saveCalibrations();
   updateCalibStatusLabel(calibTargetRow);
   recomputePersonalizedThumbThreshold();
-  closeCalibration();
+
+  const angles = samples.map(s => s.facingAngle);
+  const thumbAngles = samples.map(s => s.thumbIpAngle);
+  calibLiveStatus.textContent = '';
+  calibResultSummary.textContent =
+    `記録完了：${samples.length}件のうち${templates.length}件を代表として保存しました。\n` +
+    `観測された角度: ${Math.round(Math.min(...angles))}〜${Math.round(Math.max(...angles))}度\n` +
+    `観測された親指角度: ${Math.round(Math.min(...thumbAngles))}〜${Math.round(Math.max(...thumbAngles))}度`;
+}
+
+function openCalibration(row) {
+  calibTargetRow = row;
+  calibPoseId = poseId(row);
+  calibPoseName.textContent = row.children[1].textContent;
+  calibLiveStatus.textContent = '';
+  calibResultSummary.textContent = '';
+  calibRecordBarFill.style.width = '0%';
+  calibRecording = false;
+  calibRecordBtn.disabled = false;
+  calibRecordBtn.textContent = '記録開始（5秒）';
+
+  const existing = poseCalibrations[calibPoseId];
+  if (existing) {
+    const dateStr = new Date(existing.calibratedAt).toLocaleString('ja-JP');
+    calibReuseText.textContent = `${dateStr} に取得したデータがあります。このまま使いますか？撮り直しますか？`;
+    calibReuseDialog.classList.add('visible');
+    calibCaptureArea.classList.remove('visible');
+    calibCurrentAdjustment = existing.thresholdAdjustment;
+  } else {
+    calibReuseDialog.classList.remove('visible');
+    calibCaptureArea.classList.add('visible');
+    calibCurrentAdjustment = 0;
+  }
+  calibAdjustSlider.value = calibCurrentAdjustment;
+  calibAdjustLabel.textContent = calibCurrentAdjustment.toFixed(2);
+  calibEmptyHint.style.display = 'none';
+  calibContent.classList.add('visible');
+  switchTab('calib');
+}
+
+function closeCalibration() {
+  calibRecording = false;
+  calibContent.classList.remove('visible');
+  calibEmptyHint.style.display = '';
+  calibTargetRow = null;
+  calibPoseId = null;
+  switchTab('list');
 }
 
 // キャリブレーション済みの各ポーズについて、「親指OFF想定ポーズで記録された最大角度」と
@@ -910,10 +896,10 @@ calibReuseUseBtn.addEventListener('click', () => {
   closeCalibration();
 });
 calibReuseRedoBtn.addEventListener('click', () => {
-  startCaptureFlow();
+  calibReuseDialog.classList.remove('visible');
+  calibCaptureArea.classList.add('visible');
 });
-calibExtendBtn.addEventListener('click', addExtendDirection);
-calibFinishBtn.addEventListener('click', finishCalibration);
+calibRecordBtn.addEventListener('click', startRecording);
 calibCancelBtn.addEventListener('click', closeCalibration);
 calibClearBtn.addEventListener('click', () => {
   if (calibPoseId) {
@@ -1385,7 +1371,7 @@ function loop() {
       poseResult.textContent = '手が検出されていません';
       poseRows.forEach(row => row.classList.remove('active'));
     }
-    updateCalibLiveAngle();
+    sampleCalibrationFrame();
   }
   rafId = requestAnimationFrame(loop);
 }
