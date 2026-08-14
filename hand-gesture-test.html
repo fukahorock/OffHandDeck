@@ -177,6 +177,15 @@
     color: #888;
     font-style: italic;
   }
+  tr.pose-disabled td {
+    color: #666;
+    text-decoration: line-through;
+  }
+  tr.pose-disabled td:nth-child(5),
+  tr.pose-disabled td:nth-child(6),
+  tr.pose-disabled td:nth-child(7) {
+    text-decoration: none;
+  }
   tr.reserved.active {
     background: #6a4a1a;
   }
@@ -229,6 +238,9 @@
       <input type="range" id="repeatMsSlider" min="800" max="4000" step="100" value="1500">
     </div>
     <div class="hold-slider">
+      <label><input type="checkbox" id="facingCheckToggle" checked> 手のひら向きチェック</label>
+    </div>
+    <div class="hold-slider">
       <label for="facingAngleSlider">手のひら許容角度: <span id="facingAngleLabel">75</span>度</label>
       <input type="range" id="facingAngleSlider" min="30" max="90" step="5" value="75">
     </div>
@@ -238,18 +250,18 @@
     <h2>ポーズ一覧</h2>
     <table id="poseTable">
       <thead>
-        <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th><th>連射</th><th>備考</th></tr>
+        <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th><th>有効</th><th>連射</th><th>備考</th></tr>
       </thead>
       <tbody>
-        <tr class="reserved" data-thumb="false" data-count="0" data-reserved="true"><td>1</td><td>グー</td><td>OFF</td><td>0</td><td>-</td><td>予約（トグル専用）</td></tr>
-        <tr data-thumb="true" data-count="0"><td>2</td><td>親指のみ</td><td>ON</td><td>0</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr class="reserved" data-thumb="true" data-count="4" data-reserved="true"><td>9</td><td>パー</td><td>ON</td><td>4</td><td>-</td><td>予約（トグル専用）</td></tr>
+        <tr class="reserved" data-thumb="false" data-count="0" data-reserved="true"><td>1</td><td>グー</td><td>OFF</td><td>0</td><td>-</td><td>-</td><td>予約（トグル専用）</td></tr>
+        <tr data-thumb="true" data-count="0"><td>2</td><td>親指のみ</td><td>ON</td><td>0</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr class="reserved" data-thumb="true" data-count="4" data-reserved="true"><td>9</td><td>パー</td><td>ON</td><td>4</td><td>-</td><td>-</td><td>予約（トグル専用）</td></tr>
       </tbody>
     </table>
   </div>
@@ -290,6 +302,7 @@ const repeatMsSlider = document.getElementById('repeatMsSlider');
 const repeatMsLabel = document.getElementById('repeatMsLabel');
 const facingAngleSlider = document.getElementById('facingAngleSlider');
 const facingAngleLabel = document.getElementById('facingAngleLabel');
+const facingCheckToggle = document.getElementById('facingCheckToggle');
 
 // landmark index定義（MediaPipe Hands準拠）
 const WRIST = 0;
@@ -368,6 +381,7 @@ function palmFacingAngleDeg(landmarks, handedness) {
 
 function findMatchingRow(thumbOn, otherCount) {
   for (const row of poseRows) {
+    if (row.dataset.enabled === 'false') continue;
     if ((row.dataset.thumb === 'true') === thumbOn && Number(row.dataset.count) === otherCount) {
       return row;
     }
@@ -436,6 +450,23 @@ facingAngleSlider.addEventListener('input', () => {
   FACING_ANGLE_LIMIT = Number(facingAngleSlider.value);
   facingAngleLabel.textContent = FACING_ANGLE_LIMIT;
 });
+
+// 手のひら向きチェック自体のON/OFF（OFF時は角度を問わず判定を進める）
+let facingCheckEnabled = facingCheckToggle.checked;
+facingCheckToggle.addEventListener('change', () => {
+  facingCheckEnabled = facingCheckToggle.checked;
+  facingAngleSlider.disabled = !facingCheckEnabled;
+});
+
+document.querySelectorAll('.enabled-checkbox').forEach(cb => {
+  const row = cb.closest('tr');
+  row.dataset.enabled = 'true';
+  cb.addEventListener('change', () => {
+    row.dataset.enabled = cb.checked ? 'true' : 'false';
+    row.classList.toggle('pose-disabled', !cb.checked);
+  });
+});
+
 document.querySelectorAll('.repeat-checkbox').forEach(cb => {
   cb.closest('tr').dataset.repeat = 'false';
   cb.addEventListener('change', () => {
@@ -682,9 +713,11 @@ function loop() {
         ? result.handednesses[0][0].categoryName
         : 'Right';
       const facingAngle = palmFacingAngleDeg(landmarks, handedness);
-      const facingCamera = facingAngle <= FACING_ANGLE_LIMIT;
+      const facingCamera = !facingCheckEnabled || facingAngle <= FACING_ANGLE_LIMIT;
       drawLandmarks([landmarks], facingCamera ? '#00e0ff' : '#888');
-      palmValue.textContent = `${facingCamera ? 'カメラ向き' : 'そっぽ向き'} (${Math.round(facingAngle)}°)`;
+      palmValue.textContent = facingCheckEnabled
+        ? `${facingCamera ? 'カメラ向き' : 'そっぽ向き'} (${Math.round(facingAngle)}°)`
+        : `チェック無効 (${Math.round(facingAngle)}°)`;
 
       const { thumbOn, otherCount } = judgeFingerPattern(landmarks);
       thumbValue.textContent = thumbOn ? 'ON' : 'OFF';
