@@ -591,11 +591,9 @@ function resetThumbSmoothing() {
   thumbHistory = [];
 }
 
-// MediaPipeのhandedness判定は「入力画像が鏡像（セルフィーカメラ）である」前提で出力されるが、
-// ここではvideo要素の生データ（鏡像化していない）をそのまま渡しているため左右が逆に出る。
-// 画面表示（CSSで鏡像化した見た目）上の実際の手と一致させるため、ジェスチャー対象手の判定にはこちらを使う。
+// 実測の結果、反転させると逆になったため、MediaPipeの生のhandedness値をそのまま実際の手として使う。
 function realHandedness(rawHandedness) {
-  return rawHandedness === 'Left' ? 'Right' : 'Left';
+  return rawHandedness;
 }
 
 let gestureHand = gestureHandSelect.value;
