@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <title>OffHandDeck - Hand Gesture Test</title>
 <style>
+  html {
+    overflow-y: scroll; /* スクロールバーの有無で横幅が変動し、レイアウトが行き来するのを防ぐ */
+  }
   body {
     font-family: sans-serif;
     text-align: center;
@@ -11,6 +14,7 @@
     color: #eee;
     margin: 0;
     padding: 16px;
+    overflow-x: hidden;
   }
   #status {
     margin: 8px;
@@ -24,14 +28,23 @@
     gap: 32px;
     flex-wrap: wrap;
     margin-top: 16px;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
   }
-  .left, .right {
-    flex: 0 1 auto;
+  .left {
+    flex: 1 1 400px;
+    max-width: 640px;
+  }
+  .right {
+    flex: 1 1 500px;
+    min-width: 0; /* flexアイテムがcontentの最小幅で突っ張らないようにする（表を内部スクロールさせるため） */
+    max-width: 100%;
   }
   .stage {
     position: relative;
-    width: 640px;
-    max-width: 90vw;
+    width: 100%;
+    max-width: 640px;
     margin: 0 auto;
     transform: scaleX(-1); /* 鏡表示（映像・ランドマークをまとめて反転） */
   }
@@ -79,6 +92,10 @@
   .right h2 {
     font-size: 16px;
     margin-bottom: 8px;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    max-width: 100%;
   }
   table {
     border-collapse: collapse;
@@ -346,6 +363,7 @@
 
   <div class="right">
     <h2>ポーズ一覧</h2>
+    <div class="table-wrap">
     <table id="poseTable">
       <thead>
         <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th><th>有効</th><th>連射</th><th>備考</th><th>キャリブレーション</th></tr>
@@ -362,6 +380,7 @@
         <tr class="reserved" data-thumb="true" data-count="4" data-reserved="true"><td>9</td><td>パー</td><td>ON</td><td>4</td><td>-</td><td>-</td><td>予約（トグル専用）</td><td>-</td></tr>
       </tbody>
     </table>
+    </div>
   </div>
 </div>
 
