@@ -140,10 +140,15 @@
     padding: 4px 10px;
     font-size: 13px;
   }
-  #toggleNote {
+  #toggleNote, #darkNote {
     margin-top: 10px;
     font-size: 12px;
     color: #999;
+  }
+  #toggleReason {
+    font-size: 13px;
+    color: #f0a840;
+    min-height: 18px;
   }
   #holdBar {
     width: 200px;
@@ -248,8 +253,10 @@
     <span id="trackingBadge" class="on">トラッキング: ON</span>
     <button id="resetLogBtn">ログをリセット</button>
   </div>
+  <div id="toggleReason"></div>
   <div id="toggleLog"></div>
   <p id="toggleNote">グー→パー→グー→パーを素早く（2.5秒以内）連続で行うとトグルします。閾値は仕様未確定のため仮の値です。</p>
+  <p id="darkNote">カメラを覆う・部屋を暗くするなどで映像が暗くなると、即座にOFFになります（ONに戻すのはグーパーグーパーのみ）。</p>
 </div>
 
 <script type="module">
@@ -264,6 +271,7 @@ const countValue = document.getElementById('countValue');
 const poseResult = document.getElementById('poseResult');
 const poseRows = document.querySelectorAll('#poseTable tbody tr');
 const trackingBadge = document.getElementById('trackingBadge');
+const toggleReason = document.getElementById('toggleReason');
 const toggleLog = document.getElementById('toggleLog');
 const resetLogBtn = document.getElementById('resetLogBtn');
 const holdBarFill = document.getElementById('holdBarFill');
@@ -474,10 +482,11 @@ function renderToggleLog() {
   });
 }
 
-function setTracking(on) {
+function setTracking(on, reason = 'gesture') {
   trackingOn = on;
   trackingBadge.textContent = `トラッキング: ${on ? 'ON' : 'OFF'}`;
   trackingBadge.className = on ? 'on' : 'off';
+  toggleReason.textContent = (!on && reason === 'dark') ? '暗所検知により自動OFFになりました' : '';
   if (on) {
     playTrackingOnSound();
   } else {
@@ -511,6 +520,38 @@ resetLogBtn.addEventListener('click', () => {
   lastToggleState = null;
   renderToggleLog();
 });
+
+// カメラが覆われた／暗くなった場合の高速OFF（ONに戻すのはグーパーグーパーのみ）
+const brightnessCanvas = document.createElement('canvas');
+brightnessCanvas.width = 32;
+brightnessCanvas.height = 18;
+const brightnessCtx = brightnessCanvas.getContext('2d', { willReadFrequently: true });
+const DARK_THRESHOLD = 15; // 0-255の平均輝度。仮の値
+const DARK_HOLD_MS = 300; // 誤検知防止のため、この時間暗いままなら発動。仮の値
+let darkStartTime = null;
+
+function getAverageBrightness() {
+  brightnessCtx.drawImage(video, 0, 0, brightnessCanvas.width, brightnessCanvas.height);
+  const data = brightnessCtx.getImageData(0, 0, brightnessCanvas.width, brightnessCanvas.height).data;
+  let sum = 0;
+  const pixelCount = data.length / 4;
+  for (let i = 0; i < data.length; i += 4) {
+    sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  }
+  return sum / pixelCount;
+}
+
+function checkDarkAutoOff() {
+  const brightness = getAverageBrightness();
+  if (brightness < DARK_THRESHOLD) {
+    if (darkStartTime === null) darkStartTime = performance.now();
+    if (trackingOn && performance.now() - darkStartTime >= DARK_HOLD_MS) {
+      setTracking(false, 'dark');
+    }
+  } else {
+    darkStartTime = null;
+  }
+}
 
 function drawLandmarks(landmarksList, color) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -566,6 +607,7 @@ let lastTime = -1;
 function loop() {
   if (video.readyState >= 2 && video.currentTime !== lastTime) {
     lastTime = video.currentTime;
+    checkDarkAutoOff();
     const result = handLandmarker.detectForVideo(video, performance.now());
 
     const handCount = result.landmarks ? result.landmarks.length : 0;
