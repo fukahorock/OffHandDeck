@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>OffHandDeck - Camera Test</title>
+<style>
+  body {
+    font-family: sans-serif;
+    text-align: center;
+    background: #1e1e1e;
+    color: #eee;
+  }
+  video {
+    width: 640px;
+    max-width: 90vw;
+    border: 2px solid #555;
+    border-radius: 8px;
+    transform: scaleX(-1); /* 鏡表示 */
+  }
+  #status {
+    margin: 12px;
+    font-size: 14px;
+    color: #9cf;
+  }
+</style>
+</head>
+<body>
+<h1>カメラテスト</h1>
+<p id="status">カメラへのアクセスを許可してください</p>
+<video id="video" autoplay playsinline></video>
+
+<script>
+  const video = document.getElementById('video');
+  const status = document.getElementById('status');
+
+  navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+    .then(stream => {
+      video.srcObject = stream;
+      status.textContent = 'カメラ映像を表示中';
+    })
+    .catch(err => {
+      status.textContent = 'カメラにアクセスできませんでした: ' + err.message;
+    });
+</script>
+</body>
+</html>
