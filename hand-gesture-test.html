@@ -314,7 +314,7 @@
     min-height: 18px;
     white-space: pre-line;
   }
-  #calibRecordBtn, #calibCancelBtn, #calibClearBtn {
+  #calibRecordBtn, #calibCancelBtn, #calibClearBtn, #calibPoseSettingsResetBtn {
     padding: 6px 14px;
     font-size: 13px;
     border: none;
@@ -419,6 +419,17 @@
       <div id="calibContent">
         <h3>キャリブレーション: <span id="calibPoseName"></span></h3>
 
+        <p class="calib-hint">判定時間・連射間隔はこのポーズだけの設定として上書きできます（角度のキャリブレーションとは別カテゴリの設定です）。</p>
+        <div class="hold-slider">
+          <label for="calibHoldMsSlider">判定時間（このポーズのみ）: <span id="calibHoldMsLabel">1000</span>ms</label>
+          <input type="range" id="calibHoldMsSlider" min="300" max="1500" step="50" value="1000">
+        </div>
+        <div class="hold-slider">
+          <label for="calibRepeatMsSlider">連射間隔（このポーズのみ）: <span id="calibRepeatMsLabel">1500</span>ms</label>
+          <input type="range" id="calibRepeatMsSlider" min="800" max="4000" step="100" value="1500">
+        </div>
+        <button id="calibPoseSettingsResetBtn">このポーズの設定を全体設定に戻す</button>
+
         <div id="calibReuseDialog" class="calib-reuse">
           <p id="calibReuseText"></p>
           <button id="calibReuseUseBtn">このまま使う</button>
@@ -502,6 +513,11 @@ const calibLiveStatus = document.getElementById('calibLiveStatus');
 const calibResultSummary = document.getElementById('calibResultSummary');
 const calibAdjustSlider = document.getElementById('calibAdjustSlider');
 const calibAdjustLabel = document.getElementById('calibAdjustLabel');
+const calibHoldMsSlider = document.getElementById('calibHoldMsSlider');
+const calibHoldMsLabel = document.getElementById('calibHoldMsLabel');
+const calibRepeatMsSlider = document.getElementById('calibRepeatMsSlider');
+const calibRepeatMsLabel = document.getElementById('calibRepeatMsLabel');
+const calibPoseSettingsResetBtn = document.getElementById('calibPoseSettingsResetBtn');
 const calibCancelBtn = document.getElementById('calibCancelBtn');
 const calibClearBtn = document.getElementById('calibClearBtn');
 const thumbThresholdInfo = document.getElementById('thumbThresholdInfo');
@@ -661,6 +677,34 @@ function saveCalibrations() {
 }
 
 let poseCalibrations = loadCalibrations();
+
+// ポーズごとの判定時間・連射間隔（角度のキャリブレーションとは別カテゴリだが、
+// 「このポーズだけ」を上書きしたいという要望のためキャリブレーション画面に置いている）
+const POSE_SETTINGS_STORAGE_KEY = 'offhanddeck_pose_settings';
+
+function loadPoseSettings() {
+  try {
+    return JSON.parse(localStorage.getItem(POSE_SETTINGS_STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function savePoseSettings() {
+  localStorage.setItem(POSE_SETTINGS_STORAGE_KEY, JSON.stringify(poseSettings));
+}
+
+let poseSettings = loadPoseSettings();
+
+function getHoldMsFor(row) {
+  const s = poseSettings[poseId(row)];
+  return (s && typeof s.holdMs === 'number') ? s.holdMs : HOLD_MS;
+}
+
+function getRepeatMsFor(row) {
+  const s = poseSettings[poseId(row)];
+  return (s && typeof s.repeatMs === 'number') ? s.repeatMs : REPEAT_MS;
+}
 
 // 手首を原点、手首→中指付け根の距離をスケール基準にして正規化する
 // （カメラからの距離・手の位置に依存しない比較をするため）
@@ -858,6 +902,14 @@ function openCalibration(row) {
   }
   calibAdjustSlider.value = calibCurrentAdjustment;
   calibAdjustLabel.textContent = calibCurrentAdjustment.toFixed(2);
+
+  const holdMsForPose = getHoldMsFor(row);
+  const repeatMsForPose = getRepeatMsFor(row);
+  calibHoldMsSlider.value = holdMsForPose;
+  calibHoldMsLabel.textContent = holdMsForPose;
+  calibRepeatMsSlider.value = repeatMsForPose;
+  calibRepeatMsLabel.textContent = repeatMsForPose;
+
   calibEmptyHint.style.display = 'none';
   calibContent.classList.add('visible');
   switchTab('calib');
@@ -936,6 +988,32 @@ calibAdjustSlider.addEventListener('input', () => {
     poseCalibrations[calibPoseId].thresholdAdjustment = calibCurrentAdjustment;
     saveCalibrations();
   }
+});
+
+function setPoseSetting(key, value) {
+  if (!calibPoseId) return;
+  poseSettings[calibPoseId] = { ...poseSettings[calibPoseId], [key]: value };
+  savePoseSettings();
+}
+
+calibHoldMsSlider.addEventListener('input', () => {
+  const value = Number(calibHoldMsSlider.value);
+  calibHoldMsLabel.textContent = value;
+  setPoseSetting('holdMs', value);
+});
+calibRepeatMsSlider.addEventListener('input', () => {
+  const value = Number(calibRepeatMsSlider.value);
+  calibRepeatMsLabel.textContent = value;
+  setPoseSetting('repeatMs', value);
+});
+calibPoseSettingsResetBtn.addEventListener('click', () => {
+  if (!calibPoseId) return;
+  delete poseSettings[calibPoseId];
+  savePoseSettings();
+  calibHoldMsSlider.value = HOLD_MS;
+  calibHoldMsLabel.textContent = HOLD_MS;
+  calibRepeatMsSlider.value = REPEAT_MS;
+  calibRepeatMsLabel.textContent = REPEAT_MS;
 });
 
 // SE（Web Audio APIで合成、外部音源ファイルは使わない）
@@ -1082,10 +1160,12 @@ function judgeAndConfirm(thumbOn, otherCount, landmarks) {
   }
 
   const isRepeatable = row.dataset.repeat === 'true';
+  const effectiveHoldMs = getHoldMsFor(row);
+  const effectiveRepeatMs = getRepeatMsFor(row);
 
   if (!confirmed) {
     const elapsed = performance.now() - holdStartTime;
-    const progress = Math.min(elapsed / HOLD_MS, 1);
+    const progress = Math.min(elapsed / effectiveHoldMs, 1);
     holdBarFill.style.width = `${progress * 100}%`;
 
     if (progress >= 1) {
@@ -1098,7 +1178,7 @@ function judgeAndConfirm(thumbOn, otherCount, landmarks) {
     }
   } else if (isRepeatable) {
     const sinceLastFire = performance.now() - lastFireTime;
-    const repeatProgress = Math.min(sinceLastFire / REPEAT_MS, 1);
+    const repeatProgress = Math.min(sinceLastFire / effectiveRepeatMs, 1);
     holdBarFill.style.width = `${repeatProgress * 100}%`;
 
     if (repeatProgress >= 1) {
