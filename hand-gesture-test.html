@@ -252,13 +252,18 @@
     background: #3a3a3a;
     color: #999;
   }
-  #cameraSelect {
+  #cameraSelect, #audioOutputSelect {
     padding: 6px 10px;
     font-size: 13px;
     border-radius: 6px;
     background: #2a2a2a;
     color: #eee;
     border: 1px solid #444;
+  }
+  #audioOutputNote {
+    font-size: 12px;
+    color: #999;
+    margin: 4px 0;
   }
   .calib-open-btn {
     padding: 4px 10px;
@@ -364,7 +369,16 @@
     min-height: 18px;
     white-space: pre-line;
   }
-  #calibRecordBtn, #calibCancelBtn, #calibClearBtn, #calibPoseSettingsResetBtn {
+  #calibSoundSelect {
+    padding: 4px 8px;
+    font-size: 13px;
+    border-radius: 6px;
+    background: #2a2a2a;
+    color: #eee;
+    border: 1px solid #444;
+    margin-left: 8px;
+  }
+  #calibRecordBtn, #calibCancelBtn, #calibClearBtn, #calibPoseSettingsResetBtn, #calibSoundPreviewBtn {
     padding: 6px 14px;
     font-size: 13px;
     border: none;
@@ -384,6 +398,8 @@
 <p id="status">カメラへのアクセスを許可してください</p>
 <button id="cameraToggleBtn" class="inactive">カメラ</button>
 <select id="cameraSelect"></select>
+<select id="audioOutputSelect"></select>
+<p id="audioOutputNote"></p>
 
 <div class="layout">
   <div class="left">
@@ -491,6 +507,11 @@
       <label for="calibRepeatMsSlider">連射間隔（このポーズのみ）: <span id="calibRepeatMsLabel">1500</span>ms</label>
       <input type="range" id="calibRepeatMsSlider" min="800" max="4000" step="100" value="1500">
     </div>
+    <div class="hold-slider">
+      <label for="calibSoundSelect">確定音（このポーズのみ）:</label>
+      <select id="calibSoundSelect"></select>
+      <button id="calibSoundPreviewBtn" type="button">試聴</button>
+    </div>
     <button id="calibPoseSettingsResetBtn">このポーズの設定を全体設定に戻す</button>
 
     <div id="calibReuseDialog" class="calib-reuse">
@@ -527,6 +548,8 @@ const ctx = canvas.getContext('2d');
 const status = document.getElementById('status');
 const cameraToggleBtn = document.getElementById('cameraToggleBtn');
 const cameraSelect = document.getElementById('cameraSelect');
+const audioOutputSelect = document.getElementById('audioOutputSelect');
+const audioOutputNote = document.getElementById('audioOutputNote');
 const thumbValue = document.getElementById('thumbValue');
 const countValue = document.getElementById('countValue');
 const palmValue = document.getElementById('palmValue');
@@ -567,6 +590,8 @@ const calibHoldMsLabel = document.getElementById('calibHoldMsLabel');
 const calibRepeatMsSlider = document.getElementById('calibRepeatMsSlider');
 const calibRepeatMsLabel = document.getElementById('calibRepeatMsLabel');
 const calibPoseSettingsResetBtn = document.getElementById('calibPoseSettingsResetBtn');
+const calibSoundSelect = document.getElementById('calibSoundSelect');
+const calibSoundPreviewBtn = document.getElementById('calibSoundPreviewBtn');
 const calibCancelBtn = document.getElementById('calibCancelBtn');
 const calibClearBtn = document.getElementById('calibClearBtn');
 const thumbThresholdInfo = document.getElementById('thumbThresholdInfo');
@@ -959,6 +984,8 @@ function openCalibration(row) {
   calibRepeatMsSlider.value = repeatMsForPose;
   calibRepeatMsLabel.textContent = repeatMsForPose;
 
+  calibSoundSelect.value = poseSettings[calibPoseId]?.soundKey || DEFAULT_SOUND_KEY;
+
   calibModalOverlay.classList.add('visible');
 }
 
@@ -1067,13 +1094,25 @@ calibPoseSettingsResetBtn.addEventListener('click', () => {
   calibHoldMsLabel.textContent = HOLD_MS;
   calibRepeatMsSlider.value = REPEAT_MS;
   calibRepeatMsLabel.textContent = REPEAT_MS;
+  calibSoundSelect.value = DEFAULT_SOUND_KEY;
 });
 
 // SE（Web Audio APIで合成、外部音源ファイルは使わない）
+// AudioContext.destinationへ直結すると出力デバイスを選べないため、
+// MediaStreamDestinationNode経由で<audio>要素に流し、setSinkIdで出力先を切り替えられるようにする
 let audioCtx = null;
+let audioDestNode = null;
+let audioOutputEl = null;
+
 function getAudioCtx() {
   const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-  if (!audioCtx) audioCtx = new AudioCtxClass();
+  if (!audioCtx) {
+    audioCtx = new AudioCtxClass();
+    audioDestNode = audioCtx.createMediaStreamDestination();
+    audioOutputEl = document.createElement('audio');
+    audioOutputEl.srcObject = audioDestNode.stream;
+    audioOutputEl.play().catch(() => {});
+  }
   if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
 }
@@ -1088,14 +1127,41 @@ function playTone(freq, startDelay, duration, type = 'sine', peakGain = 0.3) {
   gain.gain.setValueAtTime(0.0001, now);
   gain.gain.exponentialRampToValueAtTime(peakGain, now + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-  osc.connect(gain).connect(ctx.destination);
+  osc.connect(gain).connect(audioDestNode);
   osc.start(now);
   osc.stop(now + duration + 0.02);
 }
 
-// ショートカット確定音：単音のビープ
-function playConfirmSound() {
-  playTone(880, 0, 0.18);
+// ショートカット確定音：ポーズごとに聞き分けられるよう複数プリセットを用意する
+const SOUND_PRESETS = {
+  beep: { label: 'ビープ（標準）', play: () => playTone(880, 0, 0.18) },
+  pop: { label: 'ポップ', play: () => playTone(1300, 0, 0.08, 'square', 0.25) },
+  low: { label: '低音ポン', play: () => playTone(440, 0, 0.22, 'sine', 0.3) },
+  chime: { label: '2音チャイム', play: () => { playTone(700, 0, 0.1); playTone(1050, 0.08, 0.14); } },
+  click: { label: 'クリック', play: () => playTone(2000, 0, 0.03, 'square', 0.2) },
+};
+const DEFAULT_SOUND_KEY = 'beep';
+
+function playPresetSound(key) {
+  (SOUND_PRESETS[key] || SOUND_PRESETS[DEFAULT_SOUND_KEY]).play();
+}
+
+Object.entries(SOUND_PRESETS).forEach(([key, preset]) => {
+  const option = document.createElement('option');
+  option.value = key;
+  option.textContent = preset.label;
+  calibSoundSelect.appendChild(option);
+});
+
+calibSoundSelect.addEventListener('change', () => {
+  setPoseSetting('soundKey', calibSoundSelect.value);
+});
+calibSoundPreviewBtn.addEventListener('click', () => {
+  playPresetSound(calibSoundSelect.value);
+});
+
+function playConfirmSoundFor(row) {
+  playPresetSound(poseSettings[poseId(row)]?.soundKey || DEFAULT_SOUND_KEY);
 }
 
 // トラッキングON：上昇する2音チャイム
@@ -1224,7 +1290,7 @@ function judgeAndConfirm(thumbOn, otherCount, landmarks) {
     if (progress >= 1) {
       confirmed = true;
       lastFireTime = performance.now();
-      playConfirmSound();
+      playConfirmSoundFor(row);
       poseResult.textContent = `確定： ${row.children[1].textContent}`;
     } else {
       poseResult.textContent = `判定中： ${row.children[1].textContent}`;
@@ -1236,7 +1302,7 @@ function judgeAndConfirm(thumbOn, otherCount, landmarks) {
 
     if (repeatProgress >= 1) {
       lastFireTime = performance.now();
-      playConfirmSound();
+      playConfirmSoundFor(row);
       poseResult.textContent = `確定（連射）： ${row.children[1].textContent}`;
     }
   }
@@ -1424,6 +1490,43 @@ async function refreshCameraList() {
   }
 }
 
+async function refreshAudioOutputList() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const outputDevices = devices.filter(d => d.kind === 'audiooutput');
+  const previousValue = audioOutputSelect.value;
+
+  audioOutputSelect.innerHTML = '';
+  outputDevices.forEach((d, i) => {
+    const option = document.createElement('option');
+    option.value = d.deviceId;
+    option.textContent = d.label || `出力デバイス ${i + 1}`;
+    audioOutputSelect.appendChild(option);
+  });
+
+  if (outputDevices.some(d => d.deviceId === previousValue)) {
+    audioOutputSelect.value = previousValue;
+  }
+
+  getAudioCtx();
+  if (!audioOutputEl || typeof audioOutputEl.setSinkId !== 'function') {
+    audioOutputNote.textContent = 'このブラウザは音声出力デバイスの指定に対応していません（既定のデバイスで再生されます）';
+  }
+}
+
+audioOutputSelect.addEventListener('change', async () => {
+  getAudioCtx();
+  if (!audioOutputEl || typeof audioOutputEl.setSinkId !== 'function') {
+    audioOutputNote.textContent = 'このブラウザは音声出力デバイスの指定に対応していません（既定のデバイスで再生されます）';
+    return;
+  }
+  try {
+    await audioOutputEl.setSinkId(audioOutputSelect.value);
+    audioOutputNote.textContent = '';
+  } catch (err) {
+    audioOutputNote.textContent = '出力デバイスの切り替えに失敗しました: ' + err.message;
+  }
+});
+
 async function startCamera() {
   status.textContent = 'カメラへのアクセスを許可してください';
   const deviceId = cameraSelect.value || null;
@@ -1443,6 +1546,7 @@ async function startCamera() {
   updateCameraButton();
 
   await refreshCameraList();
+  await refreshAudioOutputList();
 
   lastTime = -1;
   rafId = requestAnimationFrame(loop);
@@ -1459,6 +1563,7 @@ cameraSelect.addEventListener('change', () => {
 
 navigator.mediaDevices.addEventListener('devicechange', () => {
   refreshCameraList().catch(() => {});
+  refreshAudioOutputList().catch(() => {});
 });
 
 cameraToggleBtn.addEventListener('click', () => {
