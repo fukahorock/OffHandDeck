@@ -189,7 +189,7 @@
   tr.reserved.active {
     background: #6a4a1a;
   }
-  #resetLogBtn {
+  #resetLogBtn, #cameraToggleBtn {
     padding: 6px 14px;
     font-size: 13px;
     border: none;
@@ -198,11 +198,15 @@
     color: #fff;
     cursor: pointer;
   }
+  #cameraToggleBtn {
+    margin: 8px;
+  }
 </style>
 </head>
 <body>
 <h1>ハンドジェスチャー認識テスト</h1>
 <p id="status">カメラへのアクセスを許可してください</p>
+<button id="cameraToggleBtn">カメラを停止</button>
 
 <div class="layout">
   <div class="left">
@@ -286,6 +290,7 @@ const video = document.getElementById('video');
 const canvas = document.getElementById('overlay');
 const ctx = canvas.getContext('2d');
 const status = document.getElementById('status');
+const cameraToggleBtn = document.getElementById('cameraToggleBtn');
 const thumbValue = document.getElementById('thumbValue');
 const countValue = document.getElementById('countValue');
 const palmValue = document.getElementById('palmValue');
@@ -661,6 +666,66 @@ function drawLandmarks(landmarksList, color) {
 }
 
 let handLandmarker = null;
+let rafId = null;
+let cameraOn = false;
+
+function updateCameraButton() {
+  cameraToggleBtn.textContent = cameraOn ? 'カメラを停止' : 'カメラを開始';
+}
+
+function clearDisplays(message) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  thumbValue.textContent = '-';
+  countValue.textContent = '-';
+  palmValue.textContent = '-';
+  lastToggleState = null;
+  resetHold();
+  poseResult.textContent = message;
+  poseRows.forEach(row => row.classList.remove('active'));
+}
+
+function stopCamera() {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+  const stream = video.srcObject;
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+  }
+  video.srcObject = null;
+  cameraOn = false;
+  updateCameraButton();
+  clearDisplays('カメラ停止中');
+  status.textContent = 'カメラ停止中';
+}
+
+async function startCamera() {
+  status.textContent = 'カメラへのアクセスを許可してください';
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+  video.srcObject = stream;
+  await new Promise(resolve => { video.onloadedmetadata = resolve; });
+  video.play();
+
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  status.textContent = '検出中...';
+  cameraOn = true;
+  updateCameraButton();
+
+  lastTime = -1;
+  rafId = requestAnimationFrame(loop);
+}
+
+cameraToggleBtn.addEventListener('click', () => {
+  if (cameraOn) {
+    stopCamera();
+  } else {
+    startCamera().catch(err => {
+      status.textContent = 'カメラ開始に失敗しました: ' + err.message;
+    });
+  }
+});
 
 async function init() {
   status.textContent = 'モデルを読み込み中...';
@@ -676,17 +741,7 @@ async function init() {
     numHands: 2
   });
 
-  status.textContent = 'カメラへのアクセスを許可してください';
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-  video.srcObject = stream;
-  await new Promise(resolve => { video.onloadedmetadata = resolve; });
-  video.play();
-
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  status.textContent = '検出中...';
-
-  requestAnimationFrame(loop);
+  await startCamera();
 }
 
 let lastTime = -1;
@@ -750,7 +805,7 @@ function loop() {
       poseRows.forEach(row => row.classList.remove('active'));
     }
   }
-  requestAnimationFrame(loop);
+  rafId = requestAnimationFrame(loop);
 }
 
 init().catch(err => {
