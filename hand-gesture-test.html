@@ -211,6 +211,10 @@
         <div class="label">他4指の本数</div>
         <div class="value" id="countValue">-</div>
       </div>
+      <div class="card">
+        <div class="label">手のひら向き</div>
+        <div class="value" id="palmValue">-</div>
+      </div>
     </div>
 
     <div id="poseResult">-</div>
@@ -268,6 +272,7 @@ const ctx = canvas.getContext('2d');
 const status = document.getElementById('status');
 const thumbValue = document.getElementById('thumbValue');
 const countValue = document.getElementById('countValue');
+const palmValue = document.getElementById('palmValue');
 const poseResult = document.getElementById('poseResult');
 const poseRows = document.querySelectorAll('#poseTable tbody tr');
 const trackingBadge = document.getElementById('trackingBadge');
@@ -324,6 +329,19 @@ function judgeFingerPattern(landmarks) {
   }
 
   return { thumbOn, otherCount };
+}
+
+// 手首→人差し指付け根→小指付け根の並びから、手のひらがカメラを向いているか推定する
+// （頬・顎に手を当てるポーズは手のひらが横を向くため、これで判定対象から除外する）
+// 符号は左右の手でミラー関係になるため反転が必要。仮の実装で符号は実測して調整すること。
+function isPalmFacingCamera(landmarks, handedness) {
+  const wrist = landmarks[WRIST];
+  const indexMcp = landmarks[5];
+  const pinkyMcp = landmarks[PINKY_MCP];
+  const v1x = indexMcp.x - wrist.x, v1y = indexMcp.y - wrist.y;
+  const v2x = pinkyMcp.x - wrist.x, v2y = pinkyMcp.y - wrist.y;
+  const crossZ = v1x * v2y - v1y * v2x;
+  return handedness === 'Left' ? crossZ > 0 : crossZ < 0;
 }
 
 function findMatchingRow(thumbOn, otherCount) {
@@ -624,30 +642,45 @@ function loop() {
       drawLandmarks(result.landmarks, '#e05555');
       thumbValue.textContent = '-';
       countValue.textContent = '-';
+      palmValue.textContent = '-';
       lastToggleState = null;
       resetHold();
       poseResult.textContent = '両手が検出されたため一時停止中（片手にしてください）';
       poseRows.forEach(row => row.classList.remove('active'));
     } else if (handCount === 1) {
       const landmarks = result.landmarks[0];
-      drawLandmarks([landmarks], '#00e0ff');
+      const handedness = result.handednesses && result.handednesses[0] && result.handednesses[0][0]
+        ? result.handednesses[0][0].categoryName
+        : 'Right';
+      const facingCamera = isPalmFacingCamera(landmarks, handedness);
+      drawLandmarks([landmarks], facingCamera ? '#00e0ff' : '#888');
+      palmValue.textContent = facingCamera ? 'カメラ向き' : 'そっぽ向き';
+
       const { thumbOn, otherCount } = judgeFingerPattern(landmarks);
       thumbValue.textContent = thumbOn ? 'ON' : 'OFF';
       countValue.textContent = otherCount;
 
-      handleToggleDetection(thumbOn, otherCount);
-
-      if (trackingOn) {
-        judgeAndConfirm(thumbOn, otherCount);
-      } else {
+      if (!facingCamera) {
+        lastToggleState = null;
         resetHold();
-        poseResult.textContent = 'OFF中（トグル検出のみ動作中）';
+        poseResult.textContent = '手のひらがカメラを向いていません（判定停止中）';
         poseRows.forEach(row => row.classList.remove('active'));
+      } else {
+        handleToggleDetection(thumbOn, otherCount);
+
+        if (trackingOn) {
+          judgeAndConfirm(thumbOn, otherCount);
+        } else {
+          resetHold();
+          poseResult.textContent = 'OFF中（トグル検出のみ動作中）';
+          poseRows.forEach(row => row.classList.remove('active'));
+        }
       }
     } else {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       thumbValue.textContent = '-';
       countValue.textContent = '-';
+      palmValue.textContent = '-';
       lastToggleState = null;
       resetHold();
       poseResult.textContent = '手が検出されていません';
