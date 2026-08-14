@@ -94,6 +94,66 @@
   tr.active {
     background: #3a6ea5;
   }
+  .toggle-section {
+    max-width: 900px;
+    margin: 32px auto 0;
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 16px 24px;
+  }
+  .toggle-section h2 {
+    font-size: 16px;
+    margin: 0 0 12px;
+  }
+  .toggle-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  #trackingBadge {
+    font-size: 18px;
+    font-weight: bold;
+    padding: 6px 18px;
+    border-radius: 20px;
+  }
+  #trackingBadge.on {
+    background: #2e7d32;
+    color: #fff;
+  }
+  #trackingBadge.off {
+    background: #8a2020;
+    color: #fff;
+  }
+  #toggleLog {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    min-height: 32px;
+    flex-wrap: wrap;
+  }
+  .log-chip {
+    background: #1e1e1e;
+    border: 1px solid #555;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 13px;
+  }
+  #toggleNote {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #999;
+  }
+  #resetLogBtn {
+    padding: 6px 14px;
+    font-size: 13px;
+    border: none;
+    border-radius: 6px;
+    background: #3a6ea5;
+    color: #fff;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -142,6 +202,16 @@
   </div>
 </div>
 
+<div class="toggle-section">
+  <h2>グーパーグーパー トグルテスト</h2>
+  <div class="toggle-status">
+    <span id="trackingBadge" class="on">トラッキング: ON</span>
+    <button id="resetLogBtn">ログをリセット</button>
+  </div>
+  <div id="toggleLog"></div>
+  <p id="toggleNote">グー→パー→グー→パーを素早く（2.5秒以内）連続で行うとトグルします。閾値は仕様未確定のため仮の値です。</p>
+</div>
+
 <script type="module">
 import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 
@@ -153,6 +223,9 @@ const thumbValue = document.getElementById('thumbValue');
 const countValue = document.getElementById('countValue');
 const poseResult = document.getElementById('poseResult');
 const poseRows = document.querySelectorAll('#poseTable tbody tr');
+const trackingBadge = document.getElementById('trackingBadge');
+const toggleLog = document.getElementById('toggleLog');
+const resetLogBtn = document.getElementById('resetLogBtn');
 
 // landmark index定義（MediaPipe Hands準拠）
 const WRIST = 0;
@@ -211,6 +284,60 @@ function updatePoseTable(thumbOn, otherCount) {
   });
   poseResult.textContent = matched ? `判定ポーズ： ${matched}` : '該当ポーズなし';
 }
+
+// グー→パー→グー→パー トグル検出（仕様未確定のため閾値は仮の値）
+const TOGGLE_WINDOW_MS = 2500;
+let trackingOn = true;
+let toggleEvents = [];
+let lastToggleState = null;
+
+function classifyToggleState(thumbOn, otherCount) {
+  if (!thumbOn && otherCount === 0) return 'グー';
+  if (thumbOn && otherCount === 4) return 'パー';
+  return null;
+}
+
+function renderToggleLog() {
+  toggleLog.innerHTML = '';
+  toggleEvents.forEach(ev => {
+    const chip = document.createElement('span');
+    chip.className = 'log-chip';
+    chip.textContent = ev.state;
+    toggleLog.appendChild(chip);
+  });
+}
+
+function setTracking(on) {
+  trackingOn = on;
+  trackingBadge.textContent = `トラッキング: ${on ? 'ON' : 'OFF'}`;
+  trackingBadge.className = on ? 'on' : 'off';
+}
+
+function handleToggleDetection(thumbOn, otherCount) {
+  const state = classifyToggleState(thumbOn, otherCount);
+  if (state && state !== lastToggleState) {
+    toggleEvents.push({ state, time: performance.now() });
+    if (toggleEvents.length > 4) toggleEvents.shift();
+    renderToggleLog();
+
+    if (toggleEvents.length === 4) {
+      const seq = toggleEvents.map(e => e.state).join(',');
+      const elapsed = toggleEvents[3].time - toggleEvents[0].time;
+      if (seq === 'グー,パー,グー,パー' && elapsed <= TOGGLE_WINDOW_MS) {
+        setTracking(!trackingOn);
+        toggleEvents = [];
+        renderToggleLog();
+      }
+    }
+  }
+  lastToggleState = state;
+}
+
+resetLogBtn.addEventListener('click', () => {
+  toggleEvents = [];
+  lastToggleState = null;
+  renderToggleLog();
+});
 
 function drawLandmarks(landmarks) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -272,7 +399,15 @@ function loop() {
       const { thumbOn, otherCount } = judgeFingerPattern(landmarks);
       thumbValue.textContent = thumbOn ? 'ON' : 'OFF';
       countValue.textContent = otherCount;
-      updatePoseTable(thumbOn, otherCount);
+
+      handleToggleDetection(thumbOn, otherCount);
+
+      if (trackingOn) {
+        updatePoseTable(thumbOn, otherCount);
+      } else {
+        poseResult.textContent = 'OFF中（トグル検出のみ動作中）';
+        poseRows.forEach(row => row.classList.remove('active'));
+      }
     } else {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       thumbValue.textContent = '-';
