@@ -98,6 +98,11 @@
     overflow-x: auto;
     max-width: 100%;
   }
+  #thumbThresholdInfo {
+    font-size: 12px;
+    color: #999;
+    margin: 0 0 10px;
+  }
   table {
     border-collapse: collapse;
     font-size: 13px;
@@ -396,6 +401,7 @@
     </div>
 
     <div id="poseListPane" class="tab-pane active">
+      <p id="thumbThresholdInfo">親指しきい値: デフォルト150度（ON・OFFそれぞれ1ポーズ以上キャリブレーションすると自動調整されます）</p>
       <div class="table-wrap">
       <table id="poseTable">
         <thead>
@@ -507,6 +513,7 @@ const calibAdjustLabel = document.getElementById('calibAdjustLabel');
 const calibFinishBtn = document.getElementById('calibFinishBtn');
 const calibCancelBtn = document.getElementById('calibCancelBtn');
 const calibClearBtn = document.getElementById('calibClearBtn');
+const thumbThresholdInfo = document.getElementById('thumbThresholdInfo');
 
 // landmark index定義（MediaPipe Hands準拠）
 const WRIST = 0;
@@ -545,6 +552,11 @@ function angleAtPoint(a, b, c) {
 }
 
 // 汎用デフォルト角度閾値の代替：手首からの距離比較でON/OFFを判定
+// 親指IP関節の伸展しきい値（度）。デフォルトは仮の値だが、
+// キャリブレーションデータが十分あれば実測値から自動調整される（recomputePersonalizedThumbThreshold参照）
+const DEFAULT_THUMB_ANGLE_THRESHOLD = 150;
+let THUMB_ANGLE_THRESHOLD = DEFAULT_THUMB_ANGLE_THRESHOLD;
+
 function judgeFingerPattern(landmarks) {
   const wrist = landmarks[WRIST];
   const MARGIN = 1.1;
@@ -557,7 +569,6 @@ function judgeFingerPattern(landmarks) {
   const THUMB_MARGIN = 1.05;
   const thumbAbducted = dist(landmarks[THUMB.tip], pinkyMcp) > dist(landmarks[THUMB.mcp], pinkyMcp) * THUMB_MARGIN;
 
-  const THUMB_ANGLE_THRESHOLD = 150; // 度。仮の値、実測でチューニング要
   const thumbIpAngle = angleAtPoint(landmarks[2], landmarks[3], landmarks[4]);
   const thumbStraight = thumbIpAngle > THUMB_ANGLE_THRESHOLD;
 
@@ -770,7 +781,8 @@ function captureDirection(i) {
     return;
   }
   const normalized = normalizeLandmarks(latestLandmarks);
-  calibCaptures[i] = { angleLabel: calibDirections[i].label, landmarks: normalized };
+  const thumbIpAngle = angleAtPoint(latestLandmarks[2], latestLandmarks[3], latestLandmarks[4]);
+  calibCaptures[i] = { angleLabel: calibDirections[i].label, landmarks: normalized, thumbIpAngle };
   calibCaptureStatus.textContent = `「${calibDirections[i].label}」を撮影しました（${Math.round(latestFacingAngle ?? 0)}度）`;
   renderCalibDirectionList();
 }
@@ -824,7 +836,7 @@ function closeCalibration() {
 
 function finishCalibration() {
   if (calibCaptures.filter(Boolean).length < 3) return;
-  const templates = calibCaptures.map(c => ({ angleLabel: c.angleLabel, landmarks: c.landmarks }));
+  const templates = calibCaptures.map(c => ({ angleLabel: c.angleLabel, landmarks: c.landmarks, thumbIpAngle: c.thumbIpAngle }));
   const threshold = computeThreshold(templates);
   poseCalibrations[calibPoseId] = {
     templates,
@@ -834,7 +846,40 @@ function finishCalibration() {
   };
   saveCalibrations();
   updateCalibStatusLabel(calibTargetRow);
+  recomputePersonalizedThumbThreshold();
   closeCalibration();
+}
+
+// キャリブレーション済みの各ポーズについて、「親指OFF想定ポーズで記録された最大角度」と
+// 「親指ON想定ポーズで記録された最小角度」の中間値を、その人専用の親指しきい値として採用する
+function recomputePersonalizedThumbThreshold() {
+  const offAngles = [];
+  const onAngles = [];
+  for (const [pid, calib] of Object.entries(poseCalibrations)) {
+    const thumbExpected = pid.split('_')[1] === 'true';
+    for (const t of calib.templates) {
+      if (typeof t.thumbIpAngle !== 'number') continue;
+      (thumbExpected ? onAngles : offAngles).push(t.thumbIpAngle);
+    }
+  }
+
+  if (offAngles.length > 0 && onAngles.length > 0) {
+    const offMax = Math.max(...offAngles);
+    const onMin = Math.min(...onAngles);
+    if (onMin > offMax) {
+      THUMB_ANGLE_THRESHOLD = (offMax + onMin) / 2;
+      thumbThresholdInfo.textContent =
+        `親指しきい値: ${THUMB_ANGLE_THRESHOLD.toFixed(0)}度（自動調整済み／OFF実測最大${offMax.toFixed(0)}度・ON実測最小${onMin.toFixed(0)}度）`;
+      return;
+    }
+    thumbThresholdInfo.textContent =
+      `親指しきい値: デフォルト${DEFAULT_THUMB_ANGLE_THRESHOLD}度（ON/OFFの実測値が重なっているため自動調整できません。OFF最大${offMax.toFixed(0)}度・ON最小${onMin.toFixed(0)}度）`;
+    THUMB_ANGLE_THRESHOLD = DEFAULT_THUMB_ANGLE_THRESHOLD;
+    return;
+  }
+
+  THUMB_ANGLE_THRESHOLD = DEFAULT_THUMB_ANGLE_THRESHOLD;
+  thumbThresholdInfo.textContent = `親指しきい値: デフォルト${DEFAULT_THUMB_ANGLE_THRESHOLD}度（ON・OFFそれぞれ1ポーズ以上キャリブレーションすると自動調整されます）`;
 }
 
 document.querySelectorAll('.calib-open-btn').forEach(btn => {
@@ -842,6 +887,7 @@ document.querySelectorAll('.calib-open-btn').forEach(btn => {
   btn.addEventListener('click', () => openCalibration(row));
   updateCalibStatusLabel(row);
 });
+recomputePersonalizedThumbThreshold();
 
 calibReuseUseBtn.addEventListener('click', () => {
   closeCalibration();
@@ -857,6 +903,7 @@ calibClearBtn.addEventListener('click', () => {
     delete poseCalibrations[calibPoseId];
     saveCalibrations();
     updateCalibStatusLabel(calibTargetRow);
+    recomputePersonalizedThumbThreshold();
   }
   closeCalibration();
 });
