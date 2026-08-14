@@ -112,16 +112,35 @@
   tr.active {
     background: #3a6ea5;
   }
-  .toggle-section {
-    max-width: 900px;
-    margin: 32px auto 0;
-    background: #2a2a2a;
-    border-radius: 8px;
-    padding: 16px 24px;
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #444;
   }
-  .toggle-section h2 {
-    font-size: 16px;
-    margin: 0 0 12px;
+  .tab-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    border: none;
+    border-radius: 6px 6px 0 0;
+    background: transparent;
+    color: #999;
+    cursor: pointer;
+  }
+  .tab-btn.active {
+    background: #2a2a2a;
+    color: #fff;
+    font-weight: bold;
+  }
+  .tab-pane {
+    display: none;
+  }
+  .tab-pane.active {
+    display: block;
+  }
+  .right h3 {
+    font-size: 15px;
+    margin: 4px 0 12px;
   }
   .toggle-status {
     display: flex;
@@ -236,21 +255,15 @@
   .calib-status.done {
     color: #7fd18a;
   }
-  .calib-panel {
+  #calibEmptyHint {
+    font-size: 13px;
+    color: #999;
+  }
+  #calibContent {
     display: none;
-    max-width: 900px;
-    margin: 24px auto 0;
-    background: #2a2a2a;
-    border-radius: 8px;
-    padding: 16px 24px;
-    text-align: left;
   }
-  .calib-panel.visible {
+  #calibContent.visible {
     display: block;
-  }
-  .calib-panel h2 {
-    font-size: 16px;
-    margin: 0 0 12px;
   }
   .calib-hint {
     font-size: 13px;
@@ -363,64 +376,75 @@
   </div>
 
   <div class="right">
-    <h2>ポーズ一覧</h2>
-    <div class="table-wrap">
-    <table id="poseTable">
-      <thead>
-        <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th><th>有効</th><th>連射</th><th>備考</th><th>キャリブレーション</th></tr>
-      </thead>
-      <tbody>
-        <tr class="reserved" data-thumb="false" data-count="0" data-reserved="true"><td>1</td><td>グー</td><td>OFF</td><td>0</td><td>-</td><td>-</td><td>予約（トグル専用）</td><td>-</td></tr>
-        <tr data-thumb="true" data-count="0"><td>2</td><td>親指のみ</td><td>ON</td><td>0</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
-        <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
-        <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
-        <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
-        <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
-        <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
-        <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
-        <tr class="reserved" data-thumb="true" data-count="4" data-reserved="true"><td>9</td><td>パー</td><td>ON</td><td>4</td><td>-</td><td>-</td><td>予約（トグル専用）</td><td>-</td></tr>
-      </tbody>
-    </table>
-    </div>
-  </div>
-</div>
-
-<div id="calibPanel" class="calib-panel">
-  <h2>キャリブレーション: <span id="calibPoseName"></span></h2>
-
-  <div id="calibReuseDialog" class="calib-reuse">
-    <p id="calibReuseText"></p>
-    <button id="calibReuseUseBtn">このまま使う</button>
-    <button id="calibReuseRedoBtn">撮り直す</button>
-  </div>
-
-  <div id="calibCaptureArea">
-    <p class="calib-hint">対象ポーズの指の形を作ってから撮影してください（各方向で少し角度を変えて撮影すると精度が上がります）。</p>
-    <div id="calibDirectionList"></div>
-    <button id="calibExtendBtn">向きを追加（拡張モード）</button>
-    <p id="calibCaptureStatus"></p>
-
-    <div class="hold-slider">
-      <label for="calibAdjustSlider">緩め ←─●───→ 厳しめ: <span id="calibAdjustLabel">0.00</span></label>
-      <input type="range" id="calibAdjustSlider" min="-0.15" max="0.15" step="0.01" value="0">
+    <div class="tab-bar">
+      <button type="button" class="tab-btn active" data-tab="list">ポーズ一覧</button>
+      <button type="button" class="tab-btn" data-tab="calib">キャリブレーション</button>
+      <button type="button" class="tab-btn" data-tab="tracking">トラッキング</button>
     </div>
 
-    <button id="calibFinishBtn">完了して保存</button>
-    <button id="calibCancelBtn">キャンセル</button>
-    <button id="calibClearBtn">キャリブレーションを削除</button>
-  </div>
-</div>
+    <div id="poseListPane" class="tab-pane active">
+      <div class="table-wrap">
+      <table id="poseTable">
+        <thead>
+          <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th><th>有効</th><th>連射</th><th>備考</th><th>キャリブレーション</th></tr>
+        </thead>
+        <tbody>
+          <tr class="reserved" data-thumb="false" data-count="0" data-reserved="true"><td>1</td><td>グー</td><td>OFF</td><td>0</td><td>-</td><td>-</td><td>予約（トグル専用）</td><td>-</td></tr>
+          <tr data-thumb="true" data-count="0"><td>2</td><td>親指のみ</td><td>ON</td><td>0</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+          <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+          <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+          <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+          <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+          <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+          <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+          <tr class="reserved" data-thumb="true" data-count="4" data-reserved="true"><td>9</td><td>パー</td><td>ON</td><td>4</td><td>-</td><td>-</td><td>予約（トグル専用）</td><td>-</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
 
-<div class="toggle-section">
-  <h2>グーパーグーパー トグルテスト</h2>
-  <div class="toggle-status">
-    <span id="trackingBadge" class="on">トラッキング: ON</span>
-    <button id="resetLogBtn">ログをリセット</button>
+    <div id="calibPane" class="tab-pane">
+      <p id="calibEmptyHint">左の「ポーズ一覧」タブの「キャリブレーション」ボタンからポーズを選んでください。</p>
+
+      <div id="calibContent">
+        <h3>キャリブレーション: <span id="calibPoseName"></span></h3>
+
+        <div id="calibReuseDialog" class="calib-reuse">
+          <p id="calibReuseText"></p>
+          <button id="calibReuseUseBtn">このまま使う</button>
+          <button id="calibReuseRedoBtn">撮り直す</button>
+        </div>
+
+        <div id="calibCaptureArea">
+          <p class="calib-hint">対象ポーズの指の形を作ってから撮影してください（各方向で少し角度を変えて撮影すると精度が上がります）。</p>
+          <div id="calibDirectionList"></div>
+          <button id="calibExtendBtn">向きを追加（拡張モード）</button>
+          <p id="calibCaptureStatus"></p>
+
+          <div class="hold-slider">
+            <label for="calibAdjustSlider">緩め ←─●───→ 厳しめ: <span id="calibAdjustLabel">0.00</span></label>
+            <input type="range" id="calibAdjustSlider" min="-0.15" max="0.15" step="0.01" value="0">
+          </div>
+
+          <button id="calibFinishBtn">完了して保存</button>
+          <button id="calibCancelBtn">キャンセル</button>
+          <button id="calibClearBtn">キャリブレーションを削除</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="trackingPane" class="tab-pane">
+      <h3>グーパーグーパー トグルテスト</h3>
+      <div class="toggle-status">
+        <span id="trackingBadge" class="on">トラッキング: ON</span>
+        <button id="resetLogBtn">ログをリセット</button>
+      </div>
+      <div id="toggleReason"></div>
+      <div id="toggleLog"></div>
+      <p id="toggleNote">グー→パー→グー→パーを素早く（2.5秒以内）連続で行うとトグルします。閾値は仕様未確定のため仮の値です。</p>
+      <p id="darkNote">カメラを覆う・部屋を暗くするなどで映像が暗くなると、即座にOFFになります（ONに戻すのはグーパーグーパーのみ）。</p>
+    </div>
   </div>
-  <div id="toggleReason"></div>
-  <div id="toggleLog"></div>
-  <p id="toggleNote">グー→パー→グー→パーを素早く（2.5秒以内）連続で行うとトグルします。閾値は仕様未確定のため仮の値です。</p>
-  <p id="darkNote">カメラを覆う・部屋を暗くするなどで映像が暗くなると、即座にOFFになります（ONに戻すのはグーパーグーパーのみ）。</p>
 </div>
 
 <script type="module">
@@ -448,7 +472,12 @@ const repeatMsLabel = document.getElementById('repeatMsLabel');
 const facingAngleSlider = document.getElementById('facingAngleSlider');
 const facingAngleLabel = document.getElementById('facingAngleLabel');
 const facingCheckToggle = document.getElementById('facingCheckToggle');
-const calibPanel = document.getElementById('calibPanel');
+const tabBtns = document.querySelectorAll('.tab-btn');
+const poseListPane = document.getElementById('poseListPane');
+const calibPane = document.getElementById('calibPane');
+const trackingPane = document.getElementById('trackingPane');
+const calibEmptyHint = document.getElementById('calibEmptyHint');
+const calibContent = document.getElementById('calibContent');
 const calibPoseName = document.getElementById('calibPoseName');
 const calibReuseDialog = document.getElementById('calibReuseDialog');
 const calibReuseText = document.getElementById('calibReuseText');
@@ -718,13 +747,17 @@ function openCalibration(row) {
     calibReuseDialog.classList.remove('visible');
     startCaptureFlow();
   }
-  calibPanel.classList.add('visible');
+  calibEmptyHint.style.display = 'none';
+  calibContent.classList.add('visible');
+  switchTab('calib');
 }
 
 function closeCalibration() {
-  calibPanel.classList.remove('visible');
+  calibContent.classList.remove('visible');
+  calibEmptyHint.style.display = '';
   calibTargetRow = null;
   calibPoseId = null;
+  switchTab('list');
 }
 
 function finishCalibration() {
@@ -842,6 +875,14 @@ facingCheckToggle.addEventListener('change', () => {
   facingCheckEnabled = facingCheckToggle.checked;
   facingAngleSlider.disabled = !facingCheckEnabled;
 });
+
+// タブ切り替え（ポーズ一覧／キャリブレーション／トラッキングを1画面に詰め込みすぎないため）
+const TAB_PANES = { list: poseListPane, calib: calibPane, tracking: trackingPane };
+function switchTab(name) {
+  tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  Object.entries(TAB_PANES).forEach(([key, el]) => el.classList.toggle('active', key === name));
+}
+tabBtns.forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 
 document.querySelectorAll('.enabled-checkbox').forEach(cb => {
   const row = cb.closest('tr');
