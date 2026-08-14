@@ -583,6 +583,23 @@ function judgeFingerPattern(landmarks) {
   return { thumbOn, otherCount };
 }
 
+// 親指は手のひらをカメラに向けた状態だと、他の指と重なって
+// MediaPipeのランドマーク推定（特に奥行き）がブレやすいため、
+// 直近数フレームの多数決で平滑化し、単発のノイズフレームに引っ張られないようにする
+const THUMB_SMOOTH_WINDOW = 5;
+let thumbHistory = [];
+
+function smoothThumbOn(rawThumbOn) {
+  thumbHistory.push(rawThumbOn);
+  if (thumbHistory.length > THUMB_SMOOTH_WINDOW) thumbHistory.shift();
+  const onCount = thumbHistory.filter(Boolean).length;
+  return onCount > thumbHistory.length / 2;
+}
+
+function resetThumbSmoothing() {
+  thumbHistory = [];
+}
+
 // 手首→人差し指付け根→小指付け根の3点から手のひらの法線（向き）を計算する
 // （頬・顎に手を当てるポーズは手のひらが真横〜背面を向くため、これで除外できる）
 // 左右の手でミラー関係になるため、法線の向きをhandednessで反転して揃える。
@@ -1224,6 +1241,7 @@ function clearDisplays(message) {
   lastToggleState = null;
   latestHandDetected = false;
   latestFacingAngle = null;
+  resetThumbSmoothing();
   resetHold();
   poseResult.textContent = message;
   poseRows.forEach(row => row.classList.remove('active'));
@@ -1311,6 +1329,7 @@ function loop() {
       lastToggleState = null;
       latestHandDetected = false;
       latestFacingAngle = null;
+      resetThumbSmoothing();
       resetHold();
       poseResult.textContent = '両手が検出されたため一時停止中（片手にしてください）';
       poseRows.forEach(row => row.classList.remove('active'));
@@ -1326,7 +1345,9 @@ function loop() {
         ? `${facingCamera ? 'カメラ向き' : 'そっぽ向き'} (${Math.round(facingAngle)}°)`
         : `チェック無効 (${Math.round(facingAngle)}°)`;
 
-      const { thumbOn, otherCount } = judgeFingerPattern(landmarks);
+      const raw = judgeFingerPattern(landmarks);
+      const thumbOn = smoothThumbOn(raw.thumbOn);
+      const otherCount = raw.otherCount;
       thumbValue.textContent = thumbOn ? 'ON' : 'OFF';
       countValue.textContent = otherCount;
 
@@ -1359,6 +1380,7 @@ function loop() {
       lastToggleState = null;
       latestHandDetected = false;
       latestFacingAngle = null;
+      resetThumbSmoothing();
       resetHold();
       poseResult.textContent = '手が検出されていません';
       poseRows.forEach(row => row.classList.remove('active'));
