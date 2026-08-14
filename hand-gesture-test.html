@@ -145,6 +145,26 @@
     font-size: 12px;
     color: #999;
   }
+  #holdBar {
+    width: 200px;
+    height: 6px;
+    background: #444;
+    border-radius: 3px;
+    margin: 8px auto 0;
+    overflow: hidden;
+  }
+  #holdBarFill {
+    height: 100%;
+    width: 0%;
+    background: #4caf50;
+  }
+  tr.reserved td {
+    color: #888;
+    font-style: italic;
+  }
+  tr.reserved.active {
+    background: #6a4a1a;
+  }
   #resetLogBtn {
     padding: 6px 14px;
     font-size: 13px;
@@ -179,24 +199,25 @@
     </div>
 
     <div id="poseResult">-</div>
+    <div id="holdBar"><div id="holdBarFill"></div></div>
   </div>
 
   <div class="right">
     <h2>ポーズ一覧</h2>
     <table id="poseTable">
       <thead>
-        <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th></tr>
+        <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th><th>備考</th></tr>
       </thead>
       <tbody>
-        <tr data-thumb="false" data-count="0"><td>1</td><td>グー</td><td>OFF</td><td>0</td></tr>
-        <tr data-thumb="true" data-count="0"><td>2</td><td>親指のみ</td><td>ON</td><td>0</td></tr>
-        <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td></tr>
-        <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td></tr>
-        <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td></tr>
-        <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td></tr>
-        <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td></tr>
-        <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td></tr>
-        <tr data-thumb="true" data-count="4"><td>9</td><td>パー</td><td>ON</td><td>4</td></tr>
+        <tr class="reserved" data-thumb="false" data-count="0" data-reserved="true"><td>1</td><td>グー</td><td>OFF</td><td>0</td><td>予約（トグル専用）</td></tr>
+        <tr data-thumb="true" data-count="0"><td>2</td><td>親指のみ</td><td>ON</td><td>0</td><td></td></tr>
+        <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td><td></td></tr>
+        <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td><td></td></tr>
+        <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td><td></td></tr>
+        <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td><td></td></tr>
+        <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td><td></td></tr>
+        <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td><td></td></tr>
+        <tr class="reserved" data-thumb="true" data-count="4" data-reserved="true"><td>9</td><td>パー</td><td>ON</td><td>4</td><td>予約（トグル専用）</td></tr>
       </tbody>
     </table>
   </div>
@@ -226,6 +247,7 @@ const poseRows = document.querySelectorAll('#poseTable tbody tr');
 const trackingBadge = document.getElementById('trackingBadge');
 const toggleLog = document.getElementById('toggleLog');
 const resetLogBtn = document.getElementById('resetLogBtn');
+const holdBarFill = document.getElementById('holdBarFill');
 
 // landmark index定義（MediaPipe Hands準拠）
 const WRIST = 0;
@@ -273,16 +295,81 @@ function judgeFingerPattern(landmarks) {
   return { thumbOn, otherCount };
 }
 
-function updatePoseTable(thumbOn, otherCount) {
-  let matched = null;
-  poseRows.forEach(row => {
-    const rowThumb = row.dataset.thumb === 'true';
-    const rowCount = Number(row.dataset.count);
-    const isMatch = rowThumb === thumbOn && rowCount === otherCount;
-    row.classList.toggle('active', isMatch);
-    if (isMatch) matched = row.children[1].textContent;
-  });
-  poseResult.textContent = matched ? `判定ポーズ： ${matched}` : '該当ポーズなし';
+function findMatchingRow(thumbOn, otherCount) {
+  for (const row of poseRows) {
+    if ((row.dataset.thumb === 'true') === thumbOn && Number(row.dataset.count) === otherCount) {
+      return row;
+    }
+  }
+  return null;
+}
+
+// 確定音（Web Audio APIで合成、外部音源ファイルは使わない）
+let audioCtx = null;
+function playConfirmSound() {
+  const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+  if (!audioCtx) audioCtx = new AudioCtxClass();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = 880;
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.3, now + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + 0.2);
+}
+
+// 静的ポーズを1〜1.5秒保持したら確定（仕様に基づく。ここでは仮に1.2秒とする）
+const HOLD_MS = 1200;
+let holdRow = null;
+let holdStartTime = null;
+let confirmed = false;
+
+function resetHold() {
+  holdRow = null;
+  holdStartTime = null;
+  confirmed = false;
+  holdBarFill.style.width = '0%';
+}
+
+function judgeAndConfirm(thumbOn, otherCount) {
+  const row = findMatchingRow(thumbOn, otherCount);
+  poseRows.forEach(r => r.classList.toggle('active', r === row));
+
+  if (!row) {
+    resetHold();
+    poseResult.textContent = '該当ポーズなし';
+    return;
+  }
+
+  if (row.dataset.reserved === 'true') {
+    resetHold();
+    poseResult.textContent = `${row.children[1].textContent}（予約ポーズ・ショートカット不可）`;
+    return;
+  }
+
+  if (row !== holdRow) {
+    holdRow = row;
+    holdStartTime = performance.now();
+    confirmed = false;
+  }
+
+  const elapsed = performance.now() - holdStartTime;
+  const progress = Math.min(elapsed / HOLD_MS, 1);
+  holdBarFill.style.width = `${progress * 100}%`;
+
+  if (progress >= 1 && !confirmed) {
+    confirmed = true;
+    playConfirmSound();
+    poseResult.textContent = `確定： ${row.children[1].textContent}`;
+  } else if (!confirmed) {
+    poseResult.textContent = `判定中： ${row.children[1].textContent}`;
+  }
 }
 
 // グー→パー→グー→パー トグル検出（仕様未確定のため閾値は仮の値）
@@ -311,6 +398,7 @@ function setTracking(on) {
   trackingOn = on;
   trackingBadge.textContent = `トラッキング: ${on ? 'ON' : 'OFF'}`;
   trackingBadge.className = on ? 'on' : 'off';
+  if (!on) resetHold();
 }
 
 function handleToggleDetection(thumbOn, otherCount) {
@@ -403,8 +491,9 @@ function loop() {
       handleToggleDetection(thumbOn, otherCount);
 
       if (trackingOn) {
-        updatePoseTable(thumbOn, otherCount);
+        judgeAndConfirm(thumbOn, otherCount);
       } else {
+        resetHold();
         poseResult.textContent = 'OFF中（トグル検出のみ動作中）';
         poseRows.forEach(row => row.classList.remove('active'));
       }
@@ -412,6 +501,7 @@ function loop() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       thumbValue.textContent = '-';
       countValue.textContent = '-';
+      resetHold();
       poseResult.textContent = '手が検出されていません';
       poseRows.forEach(row => row.classList.remove('active'));
     }
