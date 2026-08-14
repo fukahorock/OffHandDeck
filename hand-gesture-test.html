@@ -243,6 +243,14 @@
   #cameraToggleBtn {
     margin: 8px;
   }
+  #cameraSelect {
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+    background: #2a2a2a;
+    color: #eee;
+    border: 1px solid #444;
+  }
   .calib-open-btn {
     padding: 4px 10px;
     font-size: 12px;
@@ -333,6 +341,7 @@
 <h1>ハンドジェスチャー認識テスト</h1>
 <p id="status">カメラへのアクセスを許可してください</p>
 <button id="cameraToggleBtn">カメラを停止</button>
+<select id="cameraSelect"></select>
 
 <div class="layout">
   <div class="left">
@@ -477,6 +486,7 @@ const canvas = document.getElementById('overlay');
 const ctx = canvas.getContext('2d');
 const status = document.getElementById('status');
 const cameraToggleBtn = document.getElementById('cameraToggleBtn');
+const cameraSelect = document.getElementById('cameraSelect');
 const thumbValue = document.getElementById('thumbValue');
 const countValue = document.getElementById('countValue');
 const palmValue = document.getElementById('palmValue');
@@ -1349,9 +1359,34 @@ function stopCamera() {
   status.textContent = 'カメラ停止中';
 }
 
+// カメラの選択肢一覧を取得して<select>に反映する。
+// ラベルはgetUserMediaで一度許可が下りるまで空になる仕様のため、許可後に呼び直して更新する。
+async function refreshCameraList() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const videoDevices = devices.filter(d => d.kind === 'videoinput');
+  const previousValue = cameraSelect.value;
+
+  cameraSelect.innerHTML = '';
+  videoDevices.forEach((d, i) => {
+    const option = document.createElement('option');
+    option.value = d.deviceId;
+    option.textContent = d.label || `カメラ ${i + 1}`;
+    cameraSelect.appendChild(option);
+  });
+
+  if (videoDevices.some(d => d.deviceId === previousValue)) {
+    cameraSelect.value = previousValue;
+  }
+}
+
 async function startCamera() {
   status.textContent = 'カメラへのアクセスを許可してください';
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+  const deviceId = cameraSelect.value || null;
+  const constraints = {
+    video: deviceId ? { deviceId: { exact: deviceId } } : true,
+    audio: false,
+  };
+  const stream = await navigator.mediaDevices.getUserMedia(constraints);
   video.srcObject = stream;
   await new Promise(resolve => { video.onloadedmetadata = resolve; });
   video.play();
@@ -1362,9 +1397,24 @@ async function startCamera() {
   cameraOn = true;
   updateCameraButton();
 
+  await refreshCameraList();
+
   lastTime = -1;
   rafId = requestAnimationFrame(loop);
 }
+
+cameraSelect.addEventListener('change', () => {
+  if (cameraOn) {
+    stopCamera();
+    startCamera().catch(err => {
+      status.textContent = 'カメラ切り替えに失敗しました: ' + err.message;
+    });
+  }
+});
+
+navigator.mediaDevices.addEventListener('devicechange', () => {
+  refreshCameraList().catch(() => {});
+});
 
 cameraToggleBtn.addEventListener('click', () => {
   if (cameraOn) {
