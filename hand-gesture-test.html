@@ -242,6 +242,15 @@
   }
   #cameraToggleBtn {
     margin: 8px;
+    font-weight: bold;
+  }
+  #cameraToggleBtn.active {
+    background: #2e7d32;
+    color: #fff;
+  }
+  #cameraToggleBtn.inactive {
+    background: #3a3a3a;
+    color: #999;
   }
   #cameraSelect {
     padding: 6px 10px;
@@ -268,15 +277,48 @@
   .calib-status.done {
     color: #7fd18a;
   }
-  #calibEmptyHint {
-    font-size: 13px;
-    color: #999;
-  }
-  #calibContent {
+  .calib-modal-overlay {
     display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
   }
-  #calibContent.visible {
-    display: block;
+  .calib-modal-overlay.visible {
+    display: flex;
+  }
+  .calib-modal {
+    position: relative;
+    background: #2a2a2a;
+    border-radius: 10px;
+    padding: 24px;
+    max-width: 560px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    text-align: left;
+  }
+  .calib-modal h3 {
+    font-size: 16px;
+    margin: 0 0 12px;
+  }
+  .calib-modal-close-x {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+  .calib-modal-close-x:hover {
+    color: #fff;
   }
   .calib-hint {
     font-size: 13px;
@@ -340,7 +382,7 @@
 <body>
 <h1>ハンドジェスチャー認識テスト</h1>
 <p id="status">カメラへのアクセスを許可してください</p>
-<button id="cameraToggleBtn">カメラを停止</button>
+<button id="cameraToggleBtn" class="inactive">カメラ</button>
 <select id="cameraSelect"></select>
 
 <div class="layout">
@@ -396,7 +438,6 @@
   <div class="right">
     <div class="tab-bar">
       <button type="button" class="tab-btn active" data-tab="list">ポーズ一覧</button>
-      <button type="button" class="tab-btn" data-tab="calib">キャリブレーション</button>
       <button type="button" class="tab-btn" data-tab="tracking">トラッキング</button>
     </div>
 
@@ -422,48 +463,6 @@
       </div>
     </div>
 
-    <div id="calibPane" class="tab-pane">
-      <p id="calibEmptyHint">左の「ポーズ一覧」タブの「キャリブレーション」ボタンからポーズを選んでください。</p>
-
-      <div id="calibContent">
-        <h3>キャリブレーション: <span id="calibPoseName"></span></h3>
-
-        <p class="calib-hint">判定時間・連射間隔はこのポーズだけの設定として上書きできます（角度のキャリブレーションとは別カテゴリの設定です）。</p>
-        <div class="hold-slider">
-          <label for="calibHoldMsSlider">判定時間（このポーズのみ）: <span id="calibHoldMsLabel">1000</span>ms</label>
-          <input type="range" id="calibHoldMsSlider" min="300" max="1500" step="50" value="1000">
-        </div>
-        <div class="hold-slider">
-          <label for="calibRepeatMsSlider">連射間隔（このポーズのみ）: <span id="calibRepeatMsLabel">1500</span>ms</label>
-          <input type="range" id="calibRepeatMsSlider" min="800" max="4000" step="100" value="1500">
-        </div>
-        <button id="calibPoseSettingsResetBtn">このポーズの設定を全体設定に戻す</button>
-
-        <div id="calibReuseDialog" class="calib-reuse">
-          <p id="calibReuseText"></p>
-          <button id="calibReuseUseBtn">このまま使う</button>
-          <button id="calibReuseRedoBtn">撮り直す</button>
-        </div>
-
-        <div id="calibCaptureArea">
-          <p class="calib-hint">対象ポーズの指の形を作ったら「記録開始」を押し、指の形はそのまま維持しながら、手のひらをカメラに向けた状態からゆっくり手の甲側まで回転させてください（無理のない範囲で構いません）。指の形は演出せず自然なまま、向きだけ大きく動かして自動で記録・分析します。</p>
-
-          <button id="calibRecordBtn">記録開始（8秒）</button>
-          <div id="calibRecordBar"><div id="calibRecordBarFill"></div></div>
-          <p id="calibLiveStatus"></p>
-          <p id="calibResultSummary"></p>
-
-          <div class="hold-slider">
-            <label for="calibAdjustSlider">緩め ←─●───→ 厳しめ: <span id="calibAdjustLabel">0.00</span></label>
-            <input type="range" id="calibAdjustSlider" min="-0.15" max="0.15" step="0.01" value="0">
-          </div>
-
-          <button id="calibCancelBtn">閉じる</button>
-          <button id="calibClearBtn">キャリブレーションを削除</button>
-        </div>
-      </div>
-    </div>
-
     <div id="trackingPane" class="tab-pane">
       <h3>グーパーグーパー トグルテスト</h3>
       <div class="toggle-status">
@@ -474,6 +473,47 @@
       <div id="toggleLog"></div>
       <p id="toggleNote">グー→パー→グー→パーを素早く（2.5秒以内）連続で行うとトグルします。閾値は仕様未確定のため仮の値です。</p>
       <p id="darkNote">カメラを覆う・部屋を暗くするなどで映像が暗くなると、即座にOFFになります（ONに戻すのはグーパーグーパーのみ）。</p>
+    </div>
+  </div>
+</div>
+
+<div id="calibModalOverlay" class="calib-modal-overlay">
+  <div class="calib-modal">
+    <button id="calibModalCloseX" class="calib-modal-close-x">×</button>
+    <h3>キャリブレーション: <span id="calibPoseName"></span></h3>
+
+    <p class="calib-hint">判定時間・連射間隔はこのポーズだけの設定として上書きできます（角度のキャリブレーションとは別カテゴリの設定です）。</p>
+    <div class="hold-slider">
+      <label for="calibHoldMsSlider">判定時間（このポーズのみ）: <span id="calibHoldMsLabel">1000</span>ms</label>
+      <input type="range" id="calibHoldMsSlider" min="300" max="1500" step="50" value="1000">
+    </div>
+    <div class="hold-slider">
+      <label for="calibRepeatMsSlider">連射間隔（このポーズのみ）: <span id="calibRepeatMsLabel">1500</span>ms</label>
+      <input type="range" id="calibRepeatMsSlider" min="800" max="4000" step="100" value="1500">
+    </div>
+    <button id="calibPoseSettingsResetBtn">このポーズの設定を全体設定に戻す</button>
+
+    <div id="calibReuseDialog" class="calib-reuse">
+      <p id="calibReuseText"></p>
+      <button id="calibReuseUseBtn">このまま使う</button>
+      <button id="calibReuseRedoBtn">撮り直す</button>
+    </div>
+
+    <div id="calibCaptureArea">
+      <p class="calib-hint">対象ポーズの指の形を作ったら「記録開始」を押し、指の形はそのまま維持しながら、手のひらをカメラに向けた状態からゆっくり手の甲側まで回転させてください（無理のない範囲で構いません）。指の形は演出せず自然なまま、向きだけ大きく動かして自動で記録・分析します。</p>
+
+      <button id="calibRecordBtn">記録開始（8秒）</button>
+      <div id="calibRecordBar"><div id="calibRecordBarFill"></div></div>
+      <p id="calibLiveStatus"></p>
+      <p id="calibResultSummary"></p>
+
+      <div class="hold-slider">
+        <label for="calibAdjustSlider">緩め ←─●───→ 厳しめ: <span id="calibAdjustLabel">0.00</span></label>
+        <input type="range" id="calibAdjustSlider" min="-0.15" max="0.15" step="0.01" value="0">
+      </div>
+
+      <button id="calibCancelBtn">閉じる</button>
+      <button id="calibClearBtn">キャリブレーションを削除</button>
     </div>
   </div>
 </div>
@@ -507,10 +547,9 @@ const facingCheckToggle = document.getElementById('facingCheckToggle');
 const gestureHandSelect = document.getElementById('gestureHandSelect');
 const tabBtns = document.querySelectorAll('.tab-btn');
 const poseListPane = document.getElementById('poseListPane');
-const calibPane = document.getElementById('calibPane');
 const trackingPane = document.getElementById('trackingPane');
-const calibEmptyHint = document.getElementById('calibEmptyHint');
-const calibContent = document.getElementById('calibContent');
+const calibModalOverlay = document.getElementById('calibModalOverlay');
+const calibModalCloseX = document.getElementById('calibModalCloseX');
 const calibPoseName = document.getElementById('calibPoseName');
 const calibReuseDialog = document.getElementById('calibReuseDialog');
 const calibReuseText = document.getElementById('calibReuseText');
@@ -920,19 +959,23 @@ function openCalibration(row) {
   calibRepeatMsSlider.value = repeatMsForPose;
   calibRepeatMsLabel.textContent = repeatMsForPose;
 
-  calibEmptyHint.style.display = 'none';
-  calibContent.classList.add('visible');
-  switchTab('calib');
+  calibModalOverlay.classList.add('visible');
 }
 
 function closeCalibration() {
   calibRecording = false;
-  calibContent.classList.remove('visible');
-  calibEmptyHint.style.display = '';
+  calibModalOverlay.classList.remove('visible');
   calibTargetRow = null;
   calibPoseId = null;
-  switchTab('list');
 }
+
+calibModalCloseX.addEventListener('click', closeCalibration);
+calibModalOverlay.addEventListener('click', (e) => {
+  if (e.target === calibModalOverlay) closeCalibration();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && calibModalOverlay.classList.contains('visible')) closeCalibration();
+});
 
 // キャリブレーション済みの各ポーズについて、「親指OFF想定ポーズで記録された最大角度」と
 // 「親指ON想定ポーズで記録された最小角度」の中間値を、その人専用の親指しきい値として採用する
@@ -1095,8 +1138,8 @@ facingCheckToggle.addEventListener('change', () => {
   facingAngleSlider.disabled = !facingCheckEnabled;
 });
 
-// タブ切り替え（ポーズ一覧／キャリブレーション／トラッキングを1画面に詰め込みすぎないため）
-const TAB_PANES = { list: poseListPane, calib: calibPane, tracking: trackingPane };
+// タブ切り替え（ポーズ一覧／トラッキングを1画面に詰め込みすぎないため。キャリブレーションはポップアップで別途表示）
+const TAB_PANES = { list: poseListPane, tracking: trackingPane };
 function switchTab(name) {
   tabBtns.forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   Object.entries(TAB_PANES).forEach(([key, el]) => el.classList.toggle('active', key === name));
@@ -1326,7 +1369,9 @@ let rafId = null;
 let cameraOn = false;
 
 function updateCameraButton() {
-  cameraToggleBtn.textContent = cameraOn ? 'カメラを停止' : 'カメラを開始';
+  cameraToggleBtn.textContent = 'カメラ';
+  cameraToggleBtn.classList.toggle('active', cameraOn);
+  cameraToggleBtn.classList.toggle('inactive', !cameraOn);
 }
 
 function clearDisplays(message) {
