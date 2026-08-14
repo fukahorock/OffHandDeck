@@ -11,3 +11,4 @@ PCショートカット（上書き保存・Undo等）を実行するアプリ�
 ## テストページ
 
 - [カメラテスト](camera-test.html)
+- [ハンドジェスチャー認識テスト](hand-gesture-test.html)
