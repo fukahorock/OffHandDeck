@@ -136,6 +136,7 @@ const FINGERS = [
   { name: 'pinky', mcp: 17, pip: 18, tip: 20 },
 ];
 const THUMB = { mcp: 2, tip: 4 };
+const PINKY_MCP = 17;
 
 // 手の骨格の接続線（描画用）
 const CONNECTIONS = [
@@ -157,7 +158,11 @@ function judgeFingerPattern(landmarks) {
   const wrist = landmarks[WRIST];
   const MARGIN = 1.1;
 
-  const thumbOn = dist(wrist, landmarks[THUMB.tip]) > dist(wrist, landmarks[THUMB.mcp]) * MARGIN;
+  // 親指は他指と可動方向が違うため、手首からの距離ではなく
+  // 小指の付け根からの距離で「横に開いているか（立っているか）」を判定する
+  const pinkyMcp = landmarks[PINKY_MCP];
+  const THUMB_MARGIN = 1.05;
+  const thumbOn = dist(landmarks[THUMB.tip], pinkyMcp) > dist(landmarks[THUMB.mcp], pinkyMcp) * THUMB_MARGIN;
 
   let otherCount = 0;
   for (const f of FINGERS) {
