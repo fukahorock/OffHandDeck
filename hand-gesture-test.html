@@ -534,16 +534,34 @@ function dist(a, b) {
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
 
+// 3点 a-b-c から、bの位置での関節角度[度]を返す（180度に近いほど真っ直ぐ伸びている）
+function angleAtPoint(a, b, c) {
+  const v1 = { x: a.x - b.x, y: a.y - b.y, z: (a.z || 0) - (b.z || 0) };
+  const v2 = { x: c.x - b.x, y: c.y - b.y, z: (c.z || 0) - (b.z || 0) };
+  const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y + v1.z * v1.z) || 1;
+  const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z) || 1;
+  const cos = Math.max(-1, Math.min(1, (v1.x * v2.x + v1.y * v2.y + v1.z * v2.z) / (mag1 * mag2)));
+  return Math.acos(cos) * (180 / Math.PI);
+}
+
 // 汎用デフォルト角度閾値の代替：手首からの距離比較でON/OFFを判定
 function judgeFingerPattern(landmarks) {
   const wrist = landmarks[WRIST];
   const MARGIN = 1.1;
 
   // 親指は他指と可動方向が違うため、手首からの距離ではなく
-  // 小指の付け根からの距離で「横に開いているか（立っているか）」を判定する
+  // 小指の付け根からの距離で「横に開いているか（外転しているか）」を判定する。
+  // ただしこれだけだと、指差し等で他指を握った際に親指が自然と離れて誤ってONになることがあるため、
+  // 親指の第1関節（IP関節）が伸びているかどうかも合わせて見る（外転＋伸展の両方が揃った時だけON）
   const pinkyMcp = landmarks[PINKY_MCP];
   const THUMB_MARGIN = 1.05;
-  const thumbOn = dist(landmarks[THUMB.tip], pinkyMcp) > dist(landmarks[THUMB.mcp], pinkyMcp) * THUMB_MARGIN;
+  const thumbAbducted = dist(landmarks[THUMB.tip], pinkyMcp) > dist(landmarks[THUMB.mcp], pinkyMcp) * THUMB_MARGIN;
+
+  const THUMB_ANGLE_THRESHOLD = 150; // 度。仮の値、実測でチューニング要
+  const thumbIpAngle = angleAtPoint(landmarks[2], landmarks[3], landmarks[4]);
+  const thumbStraight = thumbIpAngle > THUMB_ANGLE_THRESHOLD;
+
+  const thumbOn = thumbAbducted && thumbStraight;
 
   let otherCount = 0;
   for (const f of FINGERS) {
