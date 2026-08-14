@@ -405,8 +405,8 @@
           <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
           <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
           <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
-          <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
-          <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+          <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td><td><input type="checkbox" class="enabled-checkbox"></td><td><input type="checkbox" class="repeat-checkbox"></td><td>非推奨（頬に手を当てる癖がある場合、誤発火しやすい）</td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+          <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td><td><input type="checkbox" class="enabled-checkbox"></td><td><input type="checkbox" class="repeat-checkbox"></td><td>非推奨（頬に手を当てる癖がある場合、誤発火しやすい）</td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
           <tr class="reserved" data-thumb="true" data-count="4" data-reserved="true"><td>9</td><td>パー</td><td>ON</td><td>4</td><td>-</td><td>-</td><td>予約（トグル専用）</td><td>-</td></tr>
         </tbody>
       </table>
@@ -1017,7 +1017,8 @@ tabBtns.forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab))
 
 document.querySelectorAll('.enabled-checkbox').forEach(cb => {
   const row = cb.closest('tr');
-  row.dataset.enabled = 'true';
+  row.dataset.enabled = cb.checked ? 'true' : 'false';
+  row.classList.toggle('pose-disabled', !cb.checked);
   cb.addEventListener('change', () => {
     row.dataset.enabled = cb.checked ? 'true' : 'false';
     row.classList.toggle('pose-disabled', !cb.checked);
