@@ -398,7 +398,7 @@
 <p id="status">カメラへのアクセスを許可してください</p>
 <button id="cameraToggleBtn" class="inactive">カメラ</button>
 <select id="cameraSelect"></select>
-<select id="audioOutputSelect"></select>
+<select id="audioOutputSelect" disabled></select>
 <p id="audioOutputNote"></p>
 
 <div class="layout">
@@ -1490,7 +1490,19 @@ async function refreshCameraList() {
   }
 }
 
+// SafariはsetSinkId自体に非対応（audiooutputデバイスの列挙もできない）。
+// 未対応ブラウザでは空リストを放置せず、はっきり非対応と表示してプルダウンを無効化する。
+const AUDIO_OUTPUT_SUPPORTED = typeof HTMLMediaElement !== 'undefined' &&
+  typeof HTMLMediaElement.prototype.setSinkId === 'function';
+
 async function refreshAudioOutputList() {
+  if (!AUDIO_OUTPUT_SUPPORTED) {
+    audioOutputSelect.innerHTML = '';
+    audioOutputSelect.disabled = true;
+    audioOutputNote.textContent = 'このブラウザ（Safari等）は音声出力デバイスの指定に対応していません（既定のデバイスで再生されます）';
+    return;
+  }
+
   const devices = await navigator.mediaDevices.enumerateDevices();
   const outputDevices = devices.filter(d => d.kind === 'audiooutput');
   const previousValue = audioOutputSelect.value;
@@ -1507,18 +1519,17 @@ async function refreshAudioOutputList() {
     audioOutputSelect.value = previousValue;
   }
 
+  audioOutputSelect.disabled = outputDevices.length === 0;
+  audioOutputNote.textContent = outputDevices.length === 0
+    ? '出力デバイスが見つかりませんでした'
+    : '';
+
   getAudioCtx();
-  if (!audioOutputEl || typeof audioOutputEl.setSinkId !== 'function') {
-    audioOutputNote.textContent = 'このブラウザは音声出力デバイスの指定に対応していません（既定のデバイスで再生されます）';
-  }
 }
 
 audioOutputSelect.addEventListener('change', async () => {
+  if (!AUDIO_OUTPUT_SUPPORTED) return;
   getAudioCtx();
-  if (!audioOutputEl || typeof audioOutputEl.setSinkId !== 'function') {
-    audioOutputNote.textContent = 'このブラウザは音声出力デバイスの指定に対応していません（既定のデバイスで再生されます）';
-    return;
-  }
   try {
     await audioOutputEl.setSinkId(audioOutputSelect.value);
     audioOutputNote.textContent = '';
