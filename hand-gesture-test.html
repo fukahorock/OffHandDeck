@@ -17,6 +17,17 @@
     font-size: 14px;
     color: #9cf;
   }
+  .layout {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 32px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+  }
+  .left, .right {
+    flex: 0 1 auto;
+  }
   .stage {
     position: relative;
     width: 640px;
@@ -62,8 +73,14 @@
     font-weight: bold;
     color: #ffd479;
   }
+  .right {
+    text-align: left;
+  }
+  .right h2 {
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
   table {
-    margin: 24px auto 0;
     border-collapse: collapse;
     font-size: 13px;
   }
@@ -83,39 +100,47 @@
 <h1>ハンドジェスチャー認識テスト</h1>
 <p id="status">カメラへのアクセスを許可してください</p>
 
-<div class="stage">
-  <video id="video" autoplay playsinline muted></video>
-  <canvas id="overlay"></canvas>
-</div>
+<div class="layout">
+  <div class="left">
+    <div class="stage">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlay"></canvas>
+    </div>
 
-<div class="result">
-  <div class="card">
-    <div class="label">親指</div>
-    <div class="value" id="thumbValue">-</div>
+    <div class="result">
+      <div class="card">
+        <div class="label">親指</div>
+        <div class="value" id="thumbValue">-</div>
+      </div>
+      <div class="card">
+        <div class="label">他4指の本数</div>
+        <div class="value" id="countValue">-</div>
+      </div>
+    </div>
+
+    <div id="poseResult">-</div>
   </div>
-  <div class="card">
-    <div class="label">他4指の本数</div>
-    <div class="value" id="countValue">-</div>
+
+  <div class="right">
+    <h2>ポーズ一覧</h2>
+    <table id="poseTable">
+      <thead>
+        <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th></tr>
+      </thead>
+      <tbody>
+        <tr data-thumb="false" data-count="0"><td>1</td><td>グー</td><td>OFF</td><td>0</td></tr>
+        <tr data-thumb="true" data-count="0"><td>2</td><td>親指のみ</td><td>ON</td><td>0</td></tr>
+        <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td></tr>
+        <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td></tr>
+        <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td></tr>
+        <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td></tr>
+        <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td></tr>
+        <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td></tr>
+        <tr data-thumb="true" data-count="4"><td>9</td><td>パー</td><td>ON</td><td>4</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
-
-<div id="poseResult">-</div>
-
-<table id="poseTable">
-  <thead>
-    <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th></tr>
-  </thead>
-  <tbody>
-    <tr data-thumb="true" data-count="0"><td>1</td><td>親指のみ</td><td>ON</td><td>0</td></tr>
-    <tr data-thumb="false" data-count="1"><td>2</td><td>他指1本のみ</td><td>OFF</td><td>1</td></tr>
-    <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td></tr>
-    <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td></tr>
-    <tr data-thumb="false" data-count="2"><td>5</td><td>チョキ（他指2本のみ）</td><td>OFF</td><td>2</td></tr>
-    <tr data-thumb="false" data-count="3"><td>6</td><td>他指3本のみ</td><td>OFF</td><td>3</td></tr>
-    <tr data-thumb="false" data-count="4"><td>7</td><td>他指4本</td><td>OFF</td><td>4</td></tr>
-    <tr data-thumb="true" data-count="4"><td>8</td><td>パー</td><td>ON</td><td>4</td></tr>
-  </tbody>
-</table>
 
 <script type="module">
 import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
