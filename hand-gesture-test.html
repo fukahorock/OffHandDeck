@@ -201,6 +201,100 @@
   #cameraToggleBtn {
     margin: 8px;
   }
+  .calib-open-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    border: none;
+    border-radius: 6px;
+    background: #3a6ea5;
+    color: #fff;
+    cursor: pointer;
+  }
+  .calib-status {
+    font-size: 11px;
+    color: #999;
+    margin-top: 4px;
+  }
+  .calib-status.done {
+    color: #7fd18a;
+  }
+  .calib-panel {
+    display: none;
+    max-width: 900px;
+    margin: 24px auto 0;
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 16px 24px;
+    text-align: left;
+  }
+  .calib-panel.visible {
+    display: block;
+  }
+  .calib-panel h2 {
+    font-size: 16px;
+    margin: 0 0 12px;
+  }
+  .calib-hint {
+    font-size: 13px;
+    color: #ccc;
+  }
+  .calib-reuse {
+    display: none;
+    background: #1e1e1e;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .calib-reuse.visible {
+    display: block;
+  }
+  #calibCaptureArea {
+    display: none;
+  }
+  #calibCaptureArea.visible {
+    display: block;
+  }
+  .calib-direction-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 6px 0;
+    font-size: 13px;
+  }
+  .calib-direction-row .dir-label {
+    width: 90px;
+  }
+  .calib-direction-row .dir-check {
+    color: #7fd18a;
+    width: 20px;
+  }
+  .calib-direction-row button {
+    padding: 4px 10px;
+    font-size: 12px;
+    border: none;
+    border-radius: 6px;
+    background: #3a6ea5;
+    color: #fff;
+    cursor: pointer;
+  }
+  #calibCaptureStatus {
+    font-size: 13px;
+    color: #f0a840;
+    min-height: 18px;
+  }
+  #calibFinishBtn, #calibCancelBtn, #calibClearBtn, #calibExtendBtn {
+    padding: 6px 14px;
+    font-size: 13px;
+    border: none;
+    border-radius: 6px;
+    background: #3a6ea5;
+    color: #fff;
+    cursor: pointer;
+    margin: 4px 6px 0 0;
+  }
+  #calibClearBtn {
+    background: #8a2020;
+  }
 </style>
 </head>
 <body>
@@ -254,20 +348,46 @@
     <h2>ポーズ一覧</h2>
     <table id="poseTable">
       <thead>
-        <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th><th>有効</th><th>連射</th><th>備考</th></tr>
+        <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th><th>有効</th><th>連射</th><th>備考</th><th>キャリブレーション</th></tr>
       </thead>
       <tbody>
-        <tr class="reserved" data-thumb="false" data-count="0" data-reserved="true"><td>1</td><td>グー</td><td>OFF</td><td>0</td><td>-</td><td>-</td><td>予約（トグル専用）</td></tr>
-        <tr data-thumb="true" data-count="0"><td>2</td><td>親指のみ</td><td>ON</td><td>0</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
-        <tr class="reserved" data-thumb="true" data-count="4" data-reserved="true"><td>9</td><td>パー</td><td>ON</td><td>4</td><td>-</td><td>-</td><td>予約（トグル専用）</td></tr>
+        <tr class="reserved" data-thumb="false" data-count="0" data-reserved="true"><td>1</td><td>グー</td><td>OFF</td><td>0</td><td>-</td><td>-</td><td>予約（トグル専用）</td><td>-</td></tr>
+        <tr data-thumb="true" data-count="0"><td>2</td><td>親指のみ</td><td>ON</td><td>0</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+        <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+        <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+        <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+        <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+        <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+        <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td><td><input type="checkbox" class="enabled-checkbox" checked></td><td><input type="checkbox" class="repeat-checkbox"></td><td></td><td><button class="calib-open-btn">キャリブレーション</button><div class="calib-status">未設定</div></td></tr>
+        <tr class="reserved" data-thumb="true" data-count="4" data-reserved="true"><td>9</td><td>パー</td><td>ON</td><td>4</td><td>-</td><td>-</td><td>予約（トグル専用）</td><td>-</td></tr>
       </tbody>
     </table>
+  </div>
+</div>
+
+<div id="calibPanel" class="calib-panel">
+  <h2>キャリブレーション: <span id="calibPoseName"></span></h2>
+
+  <div id="calibReuseDialog" class="calib-reuse">
+    <p id="calibReuseText"></p>
+    <button id="calibReuseUseBtn">このまま使う</button>
+    <button id="calibReuseRedoBtn">撮り直す</button>
+  </div>
+
+  <div id="calibCaptureArea">
+    <p class="calib-hint">対象ポーズの指の形を作ってから撮影してください（各方向で少し角度を変えて撮影すると精度が上がります）。</p>
+    <div id="calibDirectionList"></div>
+    <button id="calibExtendBtn">向きを追加（拡張モード）</button>
+    <p id="calibCaptureStatus"></p>
+
+    <div class="hold-slider">
+      <label for="calibAdjustSlider">緩め ←─●───→ 厳しめ: <span id="calibAdjustLabel">0.00</span></label>
+      <input type="range" id="calibAdjustSlider" min="-0.15" max="0.15" step="0.01" value="0">
+    </div>
+
+    <button id="calibFinishBtn">完了して保存</button>
+    <button id="calibCancelBtn">キャンセル</button>
+    <button id="calibClearBtn">キャリブレーションを削除</button>
   </div>
 </div>
 
@@ -308,6 +428,21 @@ const repeatMsLabel = document.getElementById('repeatMsLabel');
 const facingAngleSlider = document.getElementById('facingAngleSlider');
 const facingAngleLabel = document.getElementById('facingAngleLabel');
 const facingCheckToggle = document.getElementById('facingCheckToggle');
+const calibPanel = document.getElementById('calibPanel');
+const calibPoseName = document.getElementById('calibPoseName');
+const calibReuseDialog = document.getElementById('calibReuseDialog');
+const calibReuseText = document.getElementById('calibReuseText');
+const calibReuseUseBtn = document.getElementById('calibReuseUseBtn');
+const calibReuseRedoBtn = document.getElementById('calibReuseRedoBtn');
+const calibCaptureArea = document.getElementById('calibCaptureArea');
+const calibDirectionList = document.getElementById('calibDirectionList');
+const calibExtendBtn = document.getElementById('calibExtendBtn');
+const calibCaptureStatus = document.getElementById('calibCaptureStatus');
+const calibAdjustSlider = document.getElementById('calibAdjustSlider');
+const calibAdjustLabel = document.getElementById('calibAdjustLabel');
+const calibFinishBtn = document.getElementById('calibFinishBtn');
+const calibCancelBtn = document.getElementById('calibCancelBtn');
+const calibClearBtn = document.getElementById('calibClearBtn');
 
 // landmark index定義（MediaPipe Hands準拠）
 const WRIST = 0;
@@ -393,6 +528,231 @@ function findMatchingRow(thumbOn, otherCount) {
   }
   return null;
 }
+
+// ==== キャリブレーション（ポーズ登録） ====
+// ファイル保存ができないブラウザ環境のため、localStorageで代用して検証する
+const CALIB_STORAGE_KEY = 'offhanddeck_calibrations';
+
+function poseId(row) {
+  return `pose_${row.dataset.thumb}_${row.dataset.count}`;
+}
+
+function loadCalibrations() {
+  try {
+    return JSON.parse(localStorage.getItem(CALIB_STORAGE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function saveCalibrations() {
+  localStorage.setItem(CALIB_STORAGE_KEY, JSON.stringify(poseCalibrations));
+}
+
+let poseCalibrations = loadCalibrations();
+
+// 手首を原点、手首→中指付け根の距離をスケール基準にして正規化する
+// （カメラからの距離・手の位置に依存しない比較をするため）
+function normalizeLandmarks(landmarks) {
+  const wrist = landmarks[WRIST];
+  const scaleRef = landmarks[9]; // 中指の付け根
+  const scale = dist(wrist, scaleRef) || 1;
+  return landmarks.map(p => ({
+    x: (p.x - wrist.x) / scale,
+    y: (p.y - wrist.y) / scale,
+    z: (p.z - wrist.z) / scale,
+  }));
+}
+
+// 正規化済みランドマーク同士の平均距離（簡易的な類似度の代替。本来は関節角度ベースが望ましいが仮実装）
+function templateDistance(a, b) {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    sum += dist(a[i], b[i]);
+  }
+  return sum / a.length;
+}
+
+function bestTemplateDistance(normed, templates) {
+  let min = Infinity;
+  for (const t of templates) {
+    const d = templateDistance(normed, t.landmarks);
+    if (d < min) min = d;
+  }
+  return min;
+}
+
+// テンプレート間のばらつきから閾値を自動算出する（仮の係数、実測でチューニング要）
+const THRESHOLD_MARGIN_FACTOR = 1.4;
+const THRESHOLD_BASE = 0.05;
+const DEFAULT_THRESHOLD_FALLBACK = 0.25;
+
+function computeThreshold(templates) {
+  if (templates.length < 2) return DEFAULT_THRESHOLD_FALLBACK;
+  let maxDist = 0;
+  for (let i = 0; i < templates.length; i++) {
+    for (let j = i + 1; j < templates.length; j++) {
+      maxDist = Math.max(maxDist, templateDistance(templates[i].landmarks, templates[j].landmarks));
+    }
+  }
+  return maxDist * THRESHOLD_MARGIN_FACTOR + THRESHOLD_BASE;
+}
+
+function updateCalibStatusLabel(row) {
+  const statusEl = row.querySelector('.calib-status');
+  if (!statusEl) return;
+  const calib = poseCalibrations[poseId(row)];
+  if (calib) {
+    const dateStr = new Date(calib.calibratedAt).toLocaleDateString('ja-JP');
+    statusEl.textContent = `設定済み(${calib.templates.length}方向) ${dateStr}`;
+    statusEl.classList.add('done');
+  } else {
+    statusEl.textContent = '未設定';
+    statusEl.classList.remove('done');
+  }
+}
+
+let calibTargetRow = null;
+let calibPoseId = null;
+let calibDirections = [];
+let calibCaptures = [];
+let calibCurrentAdjustment = 0;
+
+function renderCalibDirectionList() {
+  calibDirectionList.innerHTML = '';
+  calibDirections.forEach((label, i) => {
+    const row = document.createElement('div');
+    row.className = 'calib-direction-row';
+
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'dir-label';
+    labelSpan.textContent = label;
+
+    const checkSpan = document.createElement('span');
+    checkSpan.className = 'dir-check';
+    checkSpan.textContent = calibCaptures[i] ? '✓' : '';
+
+    const btn = document.createElement('button');
+    btn.textContent = calibCaptures[i] ? '再撮影' : '撮影';
+    btn.addEventListener('click', () => captureDirection(i));
+
+    row.appendChild(labelSpan);
+    row.appendChild(checkSpan);
+    row.appendChild(btn);
+    calibDirectionList.appendChild(row);
+  });
+
+  const ready = calibCaptures.length >= 3 && calibCaptures.every(c => c !== null);
+  calibFinishBtn.disabled = !ready;
+}
+
+function captureDirection(i) {
+  if (!latestHandDetected || !latestLandmarks) {
+    calibCaptureStatus.textContent = '手が検出されていません';
+    return;
+  }
+  const wantThumb = calibTargetRow.dataset.thumb === 'true';
+  const wantCount = Number(calibTargetRow.dataset.count);
+  if (!latestFingerPattern || latestFingerPattern.thumbOn !== wantThumb || latestFingerPattern.otherCount !== wantCount) {
+    calibCaptureStatus.textContent = '現在の指の形がこのポーズと一致していません';
+    return;
+  }
+  const normalized = normalizeLandmarks(latestLandmarks);
+  calibCaptures[i] = { angleLabel: calibDirections[i], landmarks: normalized };
+  calibCaptureStatus.textContent = `「${calibDirections[i]}」を撮影しました`;
+  renderCalibDirectionList();
+}
+
+function addExtendDirection() {
+  const extraIndex = calibDirections.length - 2;
+  calibDirections.push(`追加${extraIndex}`);
+  calibCaptures.push(null);
+  renderCalibDirectionList();
+}
+
+function startCaptureFlow() {
+  calibDirections = ['正面', '斜め①', '斜め②'];
+  calibCaptures = [null, null, null];
+  calibCaptureStatus.textContent = '';
+  const existing = poseCalibrations[calibPoseId];
+  calibCurrentAdjustment = existing ? existing.thresholdAdjustment : 0;
+  calibAdjustSlider.value = calibCurrentAdjustment;
+  calibAdjustLabel.textContent = calibCurrentAdjustment.toFixed(2);
+  calibReuseDialog.classList.remove('visible');
+  calibCaptureArea.classList.add('visible');
+  renderCalibDirectionList();
+}
+
+function openCalibration(row) {
+  calibTargetRow = row;
+  calibPoseId = poseId(row);
+  calibPoseName.textContent = row.children[1].textContent;
+
+  const existing = poseCalibrations[calibPoseId];
+  if (existing) {
+    const dateStr = new Date(existing.calibratedAt).toLocaleString('ja-JP');
+    calibReuseText.textContent = `${dateStr} に取得したデータがあります。このまま使いますか？撮り直しますか？`;
+    calibReuseDialog.classList.add('visible');
+    calibCaptureArea.classList.remove('visible');
+  } else {
+    calibReuseDialog.classList.remove('visible');
+    startCaptureFlow();
+  }
+  calibPanel.classList.add('visible');
+}
+
+function closeCalibration() {
+  calibPanel.classList.remove('visible');
+  calibTargetRow = null;
+  calibPoseId = null;
+}
+
+function finishCalibration() {
+  if (calibCaptures.filter(Boolean).length < 3) return;
+  const templates = calibCaptures.map(c => ({ angleLabel: c.angleLabel, landmarks: c.landmarks }));
+  const threshold = computeThreshold(templates);
+  poseCalibrations[calibPoseId] = {
+    templates,
+    threshold,
+    thresholdAdjustment: calibCurrentAdjustment,
+    calibratedAt: new Date().toISOString(),
+  };
+  saveCalibrations();
+  updateCalibStatusLabel(calibTargetRow);
+  closeCalibration();
+}
+
+document.querySelectorAll('.calib-open-btn').forEach(btn => {
+  const row = btn.closest('tr');
+  btn.addEventListener('click', () => openCalibration(row));
+  updateCalibStatusLabel(row);
+});
+
+calibReuseUseBtn.addEventListener('click', () => {
+  closeCalibration();
+});
+calibReuseRedoBtn.addEventListener('click', () => {
+  startCaptureFlow();
+});
+calibExtendBtn.addEventListener('click', addExtendDirection);
+calibFinishBtn.addEventListener('click', finishCalibration);
+calibCancelBtn.addEventListener('click', closeCalibration);
+calibClearBtn.addEventListener('click', () => {
+  if (calibPoseId) {
+    delete poseCalibrations[calibPoseId];
+    saveCalibrations();
+    updateCalibStatusLabel(calibTargetRow);
+  }
+  closeCalibration();
+});
+calibAdjustSlider.addEventListener('input', () => {
+  calibCurrentAdjustment = Number(calibAdjustSlider.value);
+  calibAdjustLabel.textContent = calibCurrentAdjustment.toFixed(2);
+  if (calibPoseId && poseCalibrations[calibPoseId]) {
+    poseCalibrations[calibPoseId].thresholdAdjustment = calibCurrentAdjustment;
+    saveCalibrations();
+  }
+});
 
 // SE（Web Audio APIで合成、外部音源ファイルは使わない）
 let audioCtx = null;
@@ -492,7 +852,7 @@ function resetHold() {
   holdBarFill.style.width = '0%';
 }
 
-function judgeAndConfirm(thumbOn, otherCount) {
+function judgeAndConfirm(thumbOn, otherCount, landmarks) {
   const row = findMatchingRow(thumbOn, otherCount);
   poseRows.forEach(r => r.classList.toggle('active', r === row));
 
@@ -506,6 +866,19 @@ function judgeAndConfirm(thumbOn, otherCount) {
     resetHold();
     poseResult.textContent = `${row.children[1].textContent}（予約ポーズ・ショートカット不可）`;
     return;
+  }
+
+  // キャリブレーション済みの場合、本数一致だけでなく形状の類似度も確認する（高精度モード）
+  const calib = poseCalibrations[poseId(row)];
+  if (calib && calib.templates.length > 0) {
+    const normed = normalizeLandmarks(landmarks);
+    const distance = bestTemplateDistance(normed, calib.templates);
+    const effectiveThreshold = calib.threshold + (calib.thresholdAdjustment || 0);
+    if (distance > effectiveThreshold) {
+      resetHold();
+      poseResult.textContent = `${row.children[1].textContent}に近いですが精度不足です（類似度差: ${distance.toFixed(3)} / 閾値: ${effectiveThreshold.toFixed(3)}）`;
+      return;
+    }
   }
 
   if (row !== holdRow) {
@@ -679,6 +1052,7 @@ function clearDisplays(message) {
   countValue.textContent = '-';
   palmValue.textContent = '-';
   lastToggleState = null;
+  latestHandDetected = false;
   resetHold();
   poseResult.textContent = message;
   poseRows.forEach(row => row.classList.remove('active'));
@@ -744,6 +1118,10 @@ async function init() {
   await startCamera();
 }
 
+let latestLandmarks = null;
+let latestFingerPattern = null;
+let latestHandDetected = false;
+
 let lastTime = -1;
 function loop() {
   if (video.readyState >= 2 && video.currentTime !== lastTime) {
@@ -759,6 +1137,7 @@ function loop() {
       countValue.textContent = '-';
       palmValue.textContent = '-';
       lastToggleState = null;
+      latestHandDetected = false;
       resetHold();
       poseResult.textContent = '両手が検出されたため一時停止中（片手にしてください）';
       poseRows.forEach(row => row.classList.remove('active'));
@@ -778,6 +1157,10 @@ function loop() {
       thumbValue.textContent = thumbOn ? 'ON' : 'OFF';
       countValue.textContent = otherCount;
 
+      latestLandmarks = landmarks;
+      latestFingerPattern = { thumbOn, otherCount };
+      latestHandDetected = true;
+
       if (!facingCamera) {
         lastToggleState = null;
         resetHold();
@@ -787,7 +1170,7 @@ function loop() {
         handleToggleDetection(thumbOn, otherCount);
 
         if (trackingOn) {
-          judgeAndConfirm(thumbOn, otherCount);
+          judgeAndConfirm(thumbOn, otherCount, landmarks);
         } else {
           resetHold();
           poseResult.textContent = 'OFF中（トグル検出のみ動作中）';
@@ -800,6 +1183,7 @@ function loop() {
       countValue.textContent = '-';
       palmValue.textContent = '-';
       lastToggleState = null;
+      latestHandDetected = false;
       resetHold();
       poseResult.textContent = '手が検出されていません';
       poseRows.forEach(row => row.classList.remove('active'));
