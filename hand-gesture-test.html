@@ -368,11 +368,11 @@
       <input type="range" id="repeatMsSlider" min="800" max="4000" step="100" value="1500">
     </div>
     <div class="hold-slider">
-      <label><input type="checkbox" id="facingCheckToggle" checked> 手のひら向きチェック</label>
+      <label><input type="checkbox" id="facingCheckToggle"> 手のひら向きチェック</label>
     </div>
     <div class="hold-slider">
       <label for="facingAngleSlider">手のひら許容角度: <span id="facingAngleLabel">75</span>度</label>
-      <input type="range" id="facingAngleSlider" min="30" max="90" step="5" value="75">
+      <input type="range" id="facingAngleSlider" min="30" max="90" step="5" value="75" disabled>
     </div>
   </div>
 
@@ -418,9 +418,9 @@
         </div>
 
         <div id="calibCaptureArea">
-          <p class="calib-hint">対象ポーズの指の形を作ったら「記録開始」を押し、あとは狙わず自然に手を動かしてください（正面〜横〜裏まで、無理のない範囲で構いません）。その間の自然な状態を自動で記録・分析します。</p>
+          <p class="calib-hint">対象ポーズの指の形を作ったら「記録開始」を押し、指の形はそのまま維持しながら、手のひらをカメラに向けた状態からゆっくり手の甲側まで回転させてください（無理のない範囲で構いません）。指の形は演出せず自然なまま、向きだけ大きく動かして自動で記録・分析します。</p>
 
-          <button id="calibRecordBtn">記録開始（5秒）</button>
+          <button id="calibRecordBtn">記録開始（8秒）</button>
           <div id="calibRecordBar"><div id="calibRecordBarFill"></div></div>
           <p id="calibLiveStatus"></p>
           <p id="calibResultSummary"></p>
@@ -711,7 +711,7 @@ let calibCurrentAdjustment = 0;
 // 目標の角度に自分から合わせにいく方式だと「試験に受かりにいく」動きになってしまうため、
 // 一定時間ただ自然に手を動かしてもらい、その間にポーズが一致したフレームを自動で記録する方式にしている。
 // 記録時間・上限件数は仮の値。
-const CALIB_RECORD_DURATION_MS = 5000;
+const CALIB_RECORD_DURATION_MS = 8000;
 const CALIB_MAX_TEMPLATES = 8;
 const CALIB_MIN_SAMPLES = 3;
 
@@ -775,7 +775,7 @@ function pickRepresentativeSamples(samples) {
 function finishRecording() {
   calibRecording = false;
   calibRecordBtn.disabled = false;
-  calibRecordBtn.textContent = '記録開始（5秒）';
+  calibRecordBtn.textContent = '記録開始（8秒）';
   calibRecordBarFill.style.width = '0%';
 
   const samples = calibRecordSamples;
@@ -823,7 +823,7 @@ function openCalibration(row) {
   calibRecordBarFill.style.width = '0%';
   calibRecording = false;
   calibRecordBtn.disabled = false;
-  calibRecordBtn.textContent = '記録開始（5秒）';
+  calibRecordBtn.textContent = '記録開始（8秒）';
 
   const existing = poseCalibrations[calibPoseId];
   if (existing) {
