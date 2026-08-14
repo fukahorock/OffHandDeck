@@ -215,24 +215,28 @@
       <label for="holdMsSlider">判定時間: <span id="holdMsLabel">1000</span>ms</label>
       <input type="range" id="holdMsSlider" min="300" max="1500" step="50" value="1000">
     </div>
+    <div class="hold-slider">
+      <label for="repeatMsSlider">連射間隔: <span id="repeatMsLabel">1500</span>ms</label>
+      <input type="range" id="repeatMsSlider" min="800" max="4000" step="100" value="1500">
+    </div>
   </div>
 
   <div class="right">
     <h2>ポーズ一覧</h2>
     <table id="poseTable">
       <thead>
-        <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th><th>備考</th></tr>
+        <tr><th>No</th><th>ポーズ</th><th>親指</th><th>他指本数</th><th>連射</th><th>備考</th></tr>
       </thead>
       <tbody>
-        <tr class="reserved" data-thumb="false" data-count="0" data-reserved="true"><td>1</td><td>グー</td><td>OFF</td><td>0</td><td>予約（トグル専用）</td></tr>
-        <tr data-thumb="true" data-count="0"><td>2</td><td>親指のみ</td><td>ON</td><td>0</td><td></td></tr>
-        <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td><td></td></tr>
-        <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td><td></td></tr>
-        <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td><td></td></tr>
-        <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td><td></td></tr>
-        <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td><td></td></tr>
-        <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td><td></td></tr>
-        <tr class="reserved" data-thumb="true" data-count="4" data-reserved="true"><td>9</td><td>パー</td><td>ON</td><td>4</td><td>予約（トグル専用）</td></tr>
+        <tr class="reserved" data-thumb="false" data-count="0" data-reserved="true"><td>1</td><td>グー</td><td>OFF</td><td>0</td><td>-</td><td>予約（トグル専用）</td></tr>
+        <tr data-thumb="true" data-count="0"><td>2</td><td>親指のみ</td><td>ON</td><td>0</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="true" data-count="1"><td>3</td><td>親指＋他指1本</td><td>ON</td><td>1</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="true" data-count="2"><td>4</td><td>親指＋他指2本</td><td>ON</td><td>2</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="false" data-count="1"><td>5</td><td>他指1本</td><td>OFF</td><td>1</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="false" data-count="2"><td>6</td><td>他指2本（チョキ）</td><td>OFF</td><td>2</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="false" data-count="3"><td>7</td><td>他指3本</td><td>OFF</td><td>3</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr data-thumb="false" data-count="4"><td>8</td><td>他指4本</td><td>OFF</td><td>4</td><td><input type="checkbox" class="repeat-checkbox"></td><td></td></tr>
+        <tr class="reserved" data-thumb="true" data-count="4" data-reserved="true"><td>9</td><td>パー</td><td>ON</td><td>4</td><td>-</td><td>予約（トグル専用）</td></tr>
       </tbody>
     </table>
   </div>
@@ -265,6 +269,8 @@ const resetLogBtn = document.getElementById('resetLogBtn');
 const holdBarFill = document.getElementById('holdBarFill');
 const holdMsSlider = document.getElementById('holdMsSlider');
 const holdMsLabel = document.getElementById('holdMsLabel');
+const repeatMsSlider = document.getElementById('repeatMsSlider');
+const repeatMsLabel = document.getElementById('repeatMsLabel');
 
 // landmark index定義（MediaPipe Hands準拠）
 const WRIST = 0;
@@ -368,14 +374,30 @@ holdMsSlider.addEventListener('input', () => {
   HOLD_MS = Number(holdMsSlider.value);
   holdMsLabel.textContent = HOLD_MS;
 });
+
+// 連射モードONのポーズの再発火間隔（短時間の連射を防ぐため長めのレンジにしてある）
+let REPEAT_MS = Number(repeatMsSlider.value);
+repeatMsSlider.addEventListener('input', () => {
+  REPEAT_MS = Number(repeatMsSlider.value);
+  repeatMsLabel.textContent = REPEAT_MS;
+});
+document.querySelectorAll('.repeat-checkbox').forEach(cb => {
+  cb.closest('tr').dataset.repeat = 'false';
+  cb.addEventListener('change', () => {
+    cb.closest('tr').dataset.repeat = cb.checked ? 'true' : 'false';
+  });
+});
+
 let holdRow = null;
 let holdStartTime = null;
 let confirmed = false;
+let lastFireTime = null;
 
 function resetHold() {
   holdRow = null;
   holdStartTime = null;
   confirmed = false;
+  lastFireTime = null;
   holdBarFill.style.width = '0%';
 }
 
@@ -399,18 +421,34 @@ function judgeAndConfirm(thumbOn, otherCount) {
     holdRow = row;
     holdStartTime = performance.now();
     confirmed = false;
+    lastFireTime = null;
   }
 
-  const elapsed = performance.now() - holdStartTime;
-  const progress = Math.min(elapsed / HOLD_MS, 1);
-  holdBarFill.style.width = `${progress * 100}%`;
+  const isRepeatable = row.dataset.repeat === 'true';
 
-  if (progress >= 1 && !confirmed) {
-    confirmed = true;
-    playConfirmSound();
-    poseResult.textContent = `確定： ${row.children[1].textContent}`;
-  } else if (!confirmed) {
-    poseResult.textContent = `判定中： ${row.children[1].textContent}`;
+  if (!confirmed) {
+    const elapsed = performance.now() - holdStartTime;
+    const progress = Math.min(elapsed / HOLD_MS, 1);
+    holdBarFill.style.width = `${progress * 100}%`;
+
+    if (progress >= 1) {
+      confirmed = true;
+      lastFireTime = performance.now();
+      playConfirmSound();
+      poseResult.textContent = `確定： ${row.children[1].textContent}`;
+    } else {
+      poseResult.textContent = `判定中： ${row.children[1].textContent}`;
+    }
+  } else if (isRepeatable) {
+    const sinceLastFire = performance.now() - lastFireTime;
+    const repeatProgress = Math.min(sinceLastFire / REPEAT_MS, 1);
+    holdBarFill.style.width = `${repeatProgress * 100}%`;
+
+    if (repeatProgress >= 1) {
+      lastFireTime = performance.now();
+      playConfirmSound();
+      poseResult.textContent = `確定（連射）： ${row.children[1].textContent}`;
+    }
   }
 }
 
